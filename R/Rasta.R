@@ -49,7 +49,7 @@ Rasta <- R6::R6Class(
     #'
     #' @return A new Rasta object invisibly.
     initialize = function( class, replicates, intervals = 10L, methods = NULL,
-                           threads = 1L )
+                           stacks = NULL, threads = 1L )
     {
         # Parameter validation
         if( missing( class ) )
@@ -90,7 +90,7 @@ Rasta <- R6::R6Class(
                  ", max allowed: ", floor(replicates / 2 ) )
         }
 
-        if( private$is_positive_integer( threads ) )
+        if( ! private$is_positive_integer( threads ) )
         {
             stop( "`threads` must be numeric." )
         }
@@ -203,6 +203,42 @@ Rasta <- R6::R6Class(
       self$methods <- c( self$methods, method )
 
       invisible( self )
+    },
+
+    #' @description
+    #' Get the entropy raster for a given method
+    #'
+    #' @param method Character string. Name of the ENM method.
+    #'
+    #' @return A SpatRaster object with Rao's entropy values.
+    get_entropy_raster = function(method)
+    {
+      private$check_method(method)
+
+      if (!is.null(private$entropy_raster[[method]])) {
+        return(private$entropy_raster[[method]])
+      }
+
+      count_stack <- private$get_count_stack(method)
+      n_replicates <- self$replicates
+      midpoints <- private$midpoints
+
+      entropy_raster <- terra::app(count_stack, function(x) {
+        p <- x / sum(x)
+        K <- length(p)
+        Q <- 0
+        for (i in 1:K) {
+          for (j in 1:K) {
+            d_ij <- abs(midpoints[i] - midpoints[j])
+            Q <- Q + p[i] * p[j] * d_ij
+          }
+        }
+        return(Q)
+      }, cores = self$threads)
+
+      private$entropy_raster[[method]] <- entropy_raster
+
+      return(entropy_raster)
     }
   ),
 
@@ -213,7 +249,7 @@ Rasta <- R6::R6Class(
       #' @field midpoints Vector with midpoints used to compute Rao's entropy
       midpoints = vector(),
       
-      #' @field mean_suit_raster List that stores lazily build raster with mean
+      #' @field mean_suit_list List that stores lazily build raster with mean
       #'suitability values for each method stack
       mean_suit_list = list(),
 
