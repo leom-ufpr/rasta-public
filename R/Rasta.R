@@ -245,21 +245,21 @@ Rasta <- R6::R6Class(
   private = list(
       #' @field breaks Vector with breaks used to compute Rao's entropy
       breaks = vector(),
-
+      
       #' @field midpoints Vector with midpoints used to compute Rao's entropy
       midpoints = vector(),
       
       #' @field mean_suit_list List that stores lazily build raster with mean
       #'suitability values for each method stack
       mean_suit_list = list(),
-
+      
       #' @field quantile_stack_list List that stores `SpatRaster` stacks with
       #' count value within each interval.
       quantile_stack_list = list(),
-
+      
       #' @field stack_list List that stores suitability `SpatRaster`stacks
       stack_list = list(),
-
+      
       #' @field entropy_raster Raster with Rao's entropeis
       entropy_raster = list(),
       
@@ -276,7 +276,7 @@ Rasta <- R6::R6Class(
           if( ! pos_integer ) return( FALSE )
 
           return( TRUE )
-      }
+      },
       
       #' @description
       #' Check alignment within each SpatRaster and consistency across all
