@@ -306,6 +306,62 @@ Rasta <- R6::R6Class(
         mean_entropy <- terra::global( entropy_raster, fun = "mean", na.rm = TRUE )
 
         return( mean_entropy )
+    },
+
+    #' @description
+    #' Bootstrap the entropy for a given method
+    #'
+    #' @param method Character string. Name of the ENM method.
+    #' @param reps Integer. Number of bootstrap pseudo-replicates.
+    #' @param seed Numeric. Seed value for random number generation.
+    #'
+    #' @return A tibble with columns: method, bs_replicate, and log_mean_entropy.
+    bootstrap_entropy = function( method, reps, seed = 1L )
+    {
+        private$check_method( method )
+
+        if ( ! private$is_positive_integer( reps ) || reps < 2L )
+        {
+            stop( "`reps` must be a positive integer greater than or equal to 2." )
+        }
+
+        if ( ! is.numeric( seed ) )
+        {
+            stop( "`seed` must be numeric." )
+        }
+
+        results <- tibble::tibble(
+            method = factor(),
+            bs_replicate = integer(),
+            log_mean_entropy = numeric()
+        )
+
+        for ( i in 1:reps )
+        {
+            set.seed(seed + (i - 1) * 10)
+            indices <- sample(1:self$replicates, size = self$replicates, replace = TRUE)
+            bootstrapped_stack <- terra::subset(private$suit_stack_list[[method]], indices)
+
+            boot_rasta <- Rasta$new(
+                class = self$class,
+                replicates = self$replicates,
+                intervals = self$intervals,
+                stacks = list(bootstrapped_stack),
+                methods = method,
+                threads = self$threads,
+                .skip_checks = TRUE
+            )
+
+            mean_entropy <- boot_rasta$get_mean_entropy(method)
+            log_mean_entropy <- log10(mean_entropy)
+
+            results <- tibble::add_row(results,
+                                      method = method,
+                                      bs_replicate = i,
+                                      log_mean_entropy = log_mean_entropy)
+        }
+
+        return(results)
     }
   ),
 
