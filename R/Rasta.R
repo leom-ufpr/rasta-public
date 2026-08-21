@@ -50,10 +50,12 @@ Rasta <- R6::R6Class(
     #'   of `stacks`. Default is NULL or empty character vector.
     #' @param threads Integer. Number of threads for parallelization.
     #'   Default is 1L. Maximum should not exceed available cores.
+    #' @param .skip_checks Logical. If TRUE, skip internal checks on SpatRasters.
+    #'   Default is FALSE.
     #'
     #' @return A new Rasta object invisibly.
     initialize = function( class, replicates, intervals = 10L, methods = NULL,
-                           stacks = NULL, threads = 1L )
+                           stacks = NULL, threads = 1L, .skip_checks = FALSE )
     {
         # Parameter validation
         if( missing( class ) )
@@ -115,6 +117,12 @@ Rasta <- R6::R6Class(
             threads <- max_threads
         }
 
+        # Validate .skip_checks argument
+        if ( ! is.logical( .skip_checks ) || length( .skip_checks ) != 1L )
+        {
+            stop( ".skip_checks must be a single logical value." )
+        }
+
         # Handle methods and stacks pairing
         if( is.null( methods ) )
         {
@@ -145,6 +153,7 @@ Rasta <- R6::R6Class(
         self$replicates <- replicates
         self$intervals <- intervals
         self$threads <- threads
+        self$.skip_checks <- .skip_checks
         
         private$breaks <- seq( 0, 1, length.out = intervals + 1L )
         private$set_bins_dist_matrix()
@@ -154,8 +163,8 @@ Rasta <- R6::R6Class(
         names( private$stacks ) <- methods
 
 
-        # Run sanity checks on rasters if any are provided
-        if( length( stacks ) > 0L )
+        # Run sanity checks on rasters if any are provided and .skip_checks is FALSE
+        if( length( stacks ) > 0L && ! self$.skip_checks )
         {
             private$check_rasters()
         }
@@ -364,6 +373,9 @@ Rasta <- R6::R6Class(
           for ( method in names( private$suit_stack_list ) )
           {
               stack <- private$suit_stack_list[[ method ]]
+
+              # Round values to 3 decimal digits
+              stack <- terra::round(stack, digits = 3)
 
               limits <- terra::global( stack,
                                        fun = c( "min", "max" ),
