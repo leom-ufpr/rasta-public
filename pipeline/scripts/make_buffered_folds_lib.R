@@ -146,7 +146,7 @@ thin_occurrences <- function( occ_sf )
         return(.)
 }
 
-get_ok_pa_sf <- function( full_mask, cropped_occ, buffer_crs )
+get_ok_pa_sf <- function( full_mask, cropped_occ )
 {
     # Set buffering CRS
     buffer_crs <- "+proj=cea +lon_0=0 +lat_ts=0 +datum=WGS84 +units=m +no_defs"
