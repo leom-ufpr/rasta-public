@@ -281,7 +281,23 @@ Rasta <- R6::R6Class(
         }
 
         return( private$efficiency_raster )
-    }    
+    },
+
+    #' @description
+    #' Get the mean entropy for a given method
+    #'
+    #' @param method Character string. Name of the ENM method.
+    #'
+    #' @return A single value representing the mean entropy.
+    get_mean_entropy = function( method )
+    {
+        private$check_method( method )
+
+        entropy_raster <- self$get_entropy_raster( method )
+        mean_entropy <- terra::global( entropy_raster, fun = "mean", na.rm = TRUE )
+
+        return( mean_entropy )
+    }
   ),
 
   private = list(
