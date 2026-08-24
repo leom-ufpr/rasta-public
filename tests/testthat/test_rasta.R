@@ -318,3 +318,32 @@ test_that("Rasta constructor fails with NAs in the same layer", {
     .skip_checks = FALSE
   ), "Rasta" )
 })
+
+# New test to verify if cell values were rounded down to 3 decimal places
+
+test_that("Rasta constructor rounds cell values to 3 decimal places", {
+  # Create toy SpatRasters with high precision values
+  stack_1 <- create_toy_spatraster(5)
+  stack_2 <- create_toy_spatraster(5)
+  
+  # Set values to a high precision number
+  coords <- terra::xyFromCell(stack_1, sample(1:terra::ncell(stack_1), size = 5) )
+  stack_1[ coords ] <- runif(5, min = 0.123456789, max = 0.987654321)
+  stack_2[ coords ] <- runif(5, min = 0.123456789, max = 0.987654321)
+
+  # Initialize Rasta object
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    stacks = list(stack_1, stack_2),
+    methods = c("ANN", "GLM"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+  
+  # Extract values from the SpatRaster
+  values <- terra::values(obj$suit_stack_list$ANN)
+  
+  # Check if values are rounded to 3 decimal places
+  expect_true(all(round(values, 3) == values))
+})
