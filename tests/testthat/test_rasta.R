@@ -6,12 +6,13 @@ library(terra)
 create_toy_spatraster <- function(n_layers, n_cols = 10, n_rows = 10) {
   rasters <- vector("list", n_layers)
   for (i in seq_len(n_layers)) {
-    # Create a matrix of random values
+    # Create a matrix of random values with some NA values
     mat <- matrix(runif(n_cols * n_rows), nrow = n_rows, ncol = n_cols)
+    mat[sample(1:(n_cols * n_rows), size = 5)] <- NA
     # Convert the matrix to a SpatRaster
     rasters[[i]] <- terra::rast(mat)
   }
-  return(terra::rast(rasters))
+  return(terra::stack(rasters))
 }
 
 test_that("Rasta constructor initializes correctly with valid arguments", {
@@ -274,4 +275,46 @@ test_that("Rasta constructor fails with suitability values outside [0, 1] within
     threads = 1L,
     .skip_checks = FALSE
   ), regexp = "value outside \\[0, 1\\]")
+})
+
+# New tests for variation between multilayer SpatRasters with NA values
+
+test_that("Rasta constructor fails with NAs in different layers", {
+  # Create toy SpatRasters with NAs in different layers
+  stack_1 <- create_toy_spatraster(5)
+  stack_2 <- create_toy_spatraster(5)
+  
+  # Introduce NAs in the same cells for both stacks
+  coords <- terra::xy(stack_1)[sample(1:terra::ncell(stack_1), size = 5), ]
+  terra::values(stack_1, coords) <- NA
+  terra::values(stack_2, coords) <- NA
+  
+  expect_error(Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    stacks = list(stack_1, stack_2),
+    methods = c("ANN", "GLM"),
+    threads = 1L,
+    .skip_checks = FALSE
+  ), regexp = "NAs in different layers")
+})
+
+test_that("Rasta constructor fails with NAs in the same layer", {
+  # Create toy SpatRasters with NAs in the same layer
+  stack_1 <- create_toy_spatraster(5)
+  stack_2 <- create_toy_spatraster(5)
+  
+  # Introduce NAs in the same cells for both stacks in the same layer
+  coords <- terra::xy(stack_1)[sample(1:terra::ncell(stack_1), size = 5), ]
+  terra::values(stack_1[[1]], coords) <- NA
+  terra::values(stack_2[[1]], coords) <- NA
+  
+  expect_error(Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    stacks = list(stack_1, stack_2),
+    methods = c("ANN", "GLM"),
+    threads = 1L,
+    .skip_checks = FALSE
+  ), regexp = "NAs in the same layer")
 })
