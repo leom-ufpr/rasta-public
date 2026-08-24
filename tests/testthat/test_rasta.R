@@ -342,7 +342,7 @@ test_that("Rasta constructor rounds cell values to 3 decimal places", {
   )
   
   # Extract values from the SpatRaster
-  values <- terra::values(obj$suit_stack_list$ANN)
+  values <- terra::values(obj$private$suit_stack_list$ANN)
   
   # Check if values are rounded to 3 decimal places
   expect_true(all(round(values, 3) == values))

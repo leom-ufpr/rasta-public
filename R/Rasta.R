@@ -1,6 +1,5 @@
-' R6 Class to instantiate `Rasta` objects
-#'
-#'#' @description
+#' R6 Class to instantiate `Rasta` objects
+#' @description
 #' `Rasta` applies information theory to ensemble learning in ENM by combining
 #' outcomes from several ENM models. Data are stored as multilayer `terra`
 #' `SpatRaster` objects that can be provided at initialization or added later
@@ -35,6 +34,9 @@ Rasta <- R6::R6Class(
     #' @field entropy_stack Stack with Rao's (Q) entropy rasters
     entropy_stack = c(),
 
+    #' @field .skip_checks Used for internal object instatiation.
+    .skip_checks = FALSE,
+    
     #' @description
     #' Initialize a new Rasta object
     #'
@@ -89,11 +91,10 @@ Rasta <- R6::R6Class(
 
         intervals <- as.integer(intervals)
 
-        if( intervals < 2L || intervals > floor(replicates / 2 ) )
+        if( intervals < 2L )
         {
-            stop( "`intervals` must be between 2 and floor(replicates/2). ",
-                 "Provided: ", intervals,
-                 ", max allowed: ", floor(replicates / 2 ) )
+            stop( "`intervals` must greater or equal to 2 - provided:",
+                  intervals )
         }
 
         if( ! private$is_positive_integer( threads ) )
@@ -126,17 +127,18 @@ Rasta <- R6::R6Class(
         # Handle methods and stacks pairing
         if( is.null( methods ) )
         {
-            methods <- character( 0 )
+            stop( "`methods` must be provided." )
         }
-        if( ! is.character( methods ) )
+        if( ! is.character( methods ) | length( methods ) == 0 )
         {
-            stop( "`methods` must be a character vector." )
+            stop( "A character vector with the `methods` names is a required ",
+                  "argument" )
         }
         if( is.null( stacks ) )
         {
             stacks <- list()
         }
-        if( ! is.list( stacks ) )
+        if( ! is.list( stacks ) | length( stacks ) == 0 )
         {
             stop( "`stacks` must be a list of SpatRaster objects." )
         }
@@ -150,8 +152,9 @@ Rasta <- R6::R6Class(
 
         # Store public fields
         self$class <- class
-        self$replicates <- replicates
         self$intervals <- intervals
+        self$methods <- methods
+        self$replicates <- replicates
         self$threads <- threads
         self$.skip_checks <- .skip_checks
         
@@ -160,7 +163,7 @@ Rasta <- R6::R6Class(
         private$set_max_q()
         
         private$suit_stack_list <- stacks
-        names( private$stacks ) <- methods
+        names( private$suit_stack_list ) <- methods
 
         # Run sanity checks on rasters if .skip_checks is FALSE
         if( length( stacks ) > 0L && ! self$.skip_checks )
@@ -428,70 +431,40 @@ Rasta <- R6::R6Class(
               stack <- private$suit_stack_list[[ method ]]
 
               # Round values to 3 decimal digits
-              stack <- terra::round(stack, digits = 3)
+              stack <- terra::round( stack, digits = 3 )
 
               limits <- terra::global( stack,
                                        fun = c( "min", "max" ),
                                        na.rm = TRUE )
 
-              out_of_bounds <- any( limits[ "min", ] < 0 |
-                                    limits[ "max", ] > 1,
-                                    na.rm = TRUE )
+              out_of_bounds <- base::any( limits$min < 0 ) |
+                  base::any( limits$max > 1 ) 
 
               if ( out_of_bounds )
               {
                   stop( "Stack has suitability value outside [0, 1].")
               }
 
-              if( ! methods::is( stack, " SpatRaster" ) )
+              if( ! is( stack, "SpatRaster" ) )
               {
                   stop( "Object associated with method `", method,
-                        "` is not a terra SpatRaster." )
+                        "` is not a terra SpatRaster; got ", class( stack ) )
               }
 
               n_layers <- terra::nlyr( stack )
 
               if( n_layers != self$replicates )
               {
-                  stop( method, " SpatRaster ",
+                  stop( method, " SpatRaster",
                        " has ", n_layers,
                        " layers but expected ",
                        self$replicates, "." )
               }
-
-              private$check_alignment_within( stack, method )
           }
 
           if( length( private$suit_stack_list ) > 1L )
           {
               private$check_alignment_between()
-          }
-
-          invisible( NULL )
-      },
-
-      # Check that all layers within a SpatRaster are aligned
-      check_alignment_within = function( stack, method )
-      {
-          if( terra::nlyr( stack ) > 1L )
-          {
-              ext <- terra::ext( stack )
-              res <- terra::res( stack )
-              crs <- terra::crs( stack )
-
-              # All layers in a SpatRaster are inherently aligned within the
-              # same object. This check ensures the raster object itself is
-              # valid
-              tryCatch(
-              {
-                  terra::ncol( stack )
-                  terra::nrow( stack )
-              },
-              error = function(e)
-              {
-                  stop( method, "SpatRaster ",
-                        " has invalid structure: ", e$message )
-              } )
           }
 
           invisible( NULL )
@@ -508,67 +481,43 @@ Rasta <- R6::R6Class(
           methods <- self$methods
           method_count <- length( self$methods )
 
-          ref_stack <- private$suit_stack_list[[ methods[1] ]]
-          ref_ext <- terra::ext( ref_stack )
-          ref_res <- terra::res( ref_stack )
-          ref_crs <- terra::crs( ref_stack )
+          ref_spat <- private$suit_stack_list[[ methods[1] ]]
 
           for ( method in methods[ 2L:method_count ] )
           {
-              stack <- private$suit_stack_list[[ method ]]
-
-              if( ! identical( terra::ext( stack ), ref_ext ) )
-              {
-                  stop( method, " SpatRaster ",
-                        " has different extent than SpatRaster 1." )
-              }
-
-              if( ! identical( terra::res( stack ), ref_res ) )
-              {
-                  stop( method, " SpatRaster ",
-                        " has different resolution than SpatRaster 1." )
-              }
-
-              if( terra::crs( stack ) != ref_crs )
-              {
-                  stop( method, " SpatRaster ", i,
-                        " has different CRS than SpatRaster 1." )
-              }
+              tgt_spat <- private$suit_stack_list[[ method ]]
+              private$check_raster_geom( ref_spat, tgt_spat, method )
           }
-
-          invisible( NULL )
 
       },
 
-      # Check that a new stack is aligned with existing stacks
-      check_alignment_with_existing = function( stack )
+      # Check raster geometry
+      check_raster_geom = function( ref_spat, tgt_spat, method )
       {
-          if( length( private$suit_stack_list ) == 0L)
+          stopifnot( is( ref_spat, "SpatRaster" ) )
+          stopifnot( is( tgt_spat, "SpatRaster" ) )
+          stopifnot( is.character( method ) )
+          
+          tryCatch(
           {
-              return( invisible( NULL ) )
-          }
-
-          ref_stack <- private$suit_stack_list[[ 1L ]]
-          ref_ext <- terra::ext( ref_stack )
-          ref_res <- terra::res( ref_stack )
-          ref_crs <- terra::crs( ref_stack )
-
-          if( ! identical( terra::ext( stack ), ref_ext ) )
+              terra::compareGeom( ref_spat,
+                                  tgt_spat,
+                                  lyrs = TRUE,
+                                  crs = TRUE,
+                                  ext = TRUE,
+                                  rowcol = TRUE,
+                                  res = TRUE,
+                                  stopOnError = TRUE )
+          },
+          error = function(e)
           {
-              stop("New stack has different extent than existing stacks.")
-          }
-
-          if( ! identical( terra::res( stack ), ref_res ) )
-          {
-              stop("New stack has different resolution than existing stacks.")
-          }
-
-          if( terra::crs( stack ) != ref_crs )
-          {
-              stop( "New stack has different CRS than existing stacks." )
-          }
+              stop( method,
+                    " SpatRasters are not aligned with reference: ",
+                    e$message )
+          } )
 
           invisible( NULL )
+
       },
 
       # Check if method is known
@@ -592,14 +541,6 @@ Rasta <- R6::R6Class(
       has_raster = function( stack, name )
       {
           return( name %in% names( stack ) )
-      },
-
-      # Check if stack has `SpatRaster` labeled with `name`
-      add_to_stack = function( stack, raster, name = NULL )
-      {
-          if( ! is.null( name ) ) names( raster ) <- name
-
-          return( c( stack, raster ) )
       },
       
       # Get/set `SpatRasters` with mean suitability values
