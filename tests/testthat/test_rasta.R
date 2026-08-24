@@ -6,8 +6,10 @@ library(terra)
 create_toy_spatraster <- function(n_layers, n_cols = 10, n_rows = 10) {
   rasters <- vector("list", n_layers)
   for (i in seq_len(n_layers)) {
-    rasters[[i]] <- terra::rast(n_cols, n_rows)
-    terra::values(rasters[[i]]) <- runif(n_cols * n_rows)
+    # Create a matrix of random values
+    mat <- matrix(runif(n_cols * n_rows), nrow = n_rows, ncol = n_cols)
+    # Convert the matrix to a SpatRaster
+    rasters[[i]] <- terra::rast(mat)
   }
   return(terra::stack(rasters))
 }
