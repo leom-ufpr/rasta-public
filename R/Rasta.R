@@ -32,7 +32,7 @@ Rasta <- R6::R6Class(
     #' @field threads Number of threads for parallelized operations
     threads = NULL,
 
-    #' @field entropy_raster Stack with Rao's (Q) entropy rasters
+    #' @field entropy_stack Stack with Rao's (Q) entropy rasters
     entropy_stack = c(),
 
     #' @description
@@ -162,8 +162,7 @@ Rasta <- R6::R6Class(
         private$suit_stack_list <- stacks
         names( private$stacks ) <- methods
 
-
-        # Run sanity checks on rasters if any are provided and .skip_checks is FALSE
+        # Run sanity checks on rasters if .skip_checks is FALSE
         if( length( stacks ) > 0L && ! self$.skip_checks )
         {
             private$check_rasters()
@@ -297,7 +296,7 @@ Rasta <- R6::R6Class(
     #'
     #' @param method Character string. Name of the ENM method.
     #'
-    #' @return A single value representing the mean entropy.
+    #' @return A single value representing the mean raster entropy.
     get_mean_entropy = function( method )
     {
         private$check_method( method )
@@ -330,85 +329,84 @@ Rasta <- R6::R6Class(
             stop( "`seed` must be numeric." )
         }
 
-        results <- tibble::tibble(
-            method = factor(),
-            bs_replicate = integer(),
-            log_mean_entropy = numeric()
-        )
+        results <- tibble::tibble( method = factor(),
+                                   bs_replicate = integer(),
+                                   log_mean_entropy = numeric() )
 
         for ( i in 1:reps )
         {
-            set.seed(seed + (i - 1) * 10)
-            indices <- sample(1:self$replicates, size = self$replicates, replace = TRUE)
-            bootstrapped_stack <- terra::subset(private$suit_stack_list[[method]], indices)
+            set.seed( seed + ( i - 1 ) * 10 )
 
-            boot_rasta <- Rasta$new(
-                class = self$class,
-                replicates = self$replicates,
-                intervals = self$intervals,
-                stacks = list(bootstrapped_stack),
-                methods = method,
-                threads = self$threads,
-                .skip_checks = TRUE
-            )
+            indices <- sample( 1:self$replicates,
+                               size = self$replicates,
+                               replace = TRUE )
+
+            bootstrapped_stack <- terra::subset( private$suit_stack_list[[ method ]],
+                                                 indices )
+
+            boot_rasta <- Rasta$new( class = self$class,
+                                     replicates = self$replicates,
+                                     intervals = self$intervals,
+                                     stacks = list( bootstrapped_stack ),
+                                     methods = method,
+                                     threads = self$threads,
+                                     .skip_checks = TRUE )
 
             mean_entropy <- boot_rasta$get_mean_entropy(method)
-            log_mean_entropy <- log10(mean_entropy)
 
-            results <- tibble::add_row(results,
-                                      method = method,
-                                      bs_replicate = i,
-                                      log_mean_entropy = log_mean_entropy)
+            results <- tibble::add_row( results,
+                                        method = method,
+                                        bs_replicate = i,
+                                        log_mean_entropy = log10( mean_entropy ) )
         }
 
-        return(results)
+        return( results )
     }
   ),
 
   private = list(
-      #' @field breaks Vector with breaks used to compute Q
+      # breaks Vector with breaks used to compute Q
       breaks = vector(),
 
-      #' @field bins Matrix with intervals used to bin suitability values
+      # bins Matrix with intervals used to bin suitability values
       bins = matrix(),
       
-      #' @field distance_matrix Vector with midpoint deltas used to compute Q
+      # distance_matrix Vector with midpoint deltas used to compute Q
       dist_matrix = matrix(),
 
-      #' @field max_q Maximum possible Q value
+      # max_q Maximum possible Q value
       max_q = 0,
 
-      #' @field suit_stack_list List that stores suitability `SpatRaster`stacks
+      # suit_stack_list List that stores suitability `SpatRaster`stacks
       suit_stack_list = list(),
 
-      #' @field count_stack_list List that stores `SpatRaster`stacks with
-      #' suitability binned counts
+      # count_stack_list List that stores `SpatRaster`stacks with
+      # suitability binned counts
       count_stack_list = list(),
 
-      #' @field count_stack_list List that stores `SpatRaster`stacks with
-      #' proportional suitability counts
+      # p_stack_list List that stores `SpatRaster`stacks with
+      # proportional suitability counts
       p_stack_list = list(),
       
-      #' @field mean_suit_stack Stack that stores lazily built rasters with mean
-      #' suitability values for each method
+      # mean_suit_stack Stack that stores lazily built rasters with mean
+      # suitability values for each method
       mean_suit_stack = c(),
 
-      #' @field weight_stack Stack that stores weight rasters used in
-      #' weighted mean suitability computation
+      # weight_stack Stack that stores weight rasters used in
+      # weighted mean suitability computation
       weight_stack = c(),
 
-      #' @field weight_denominator Raster that stores denominator used in weight
-      #' computation
+      # weight_denominator Raster that stores denominator used in weight
+      # computation
       weight_denominator = NULL,
 
-      #' @field efficiency_raster Efficiency raster
+      # efficiency_raster Efficiency raster
       efficiency_raster = c(),
       
-      #' @field wgt_ensemble_raster Weighted ensemble suitability raster
+      # wgt_ensemble_raster Weighted ensemble suitability raster
       wgt_ensemble_raster = c(),
       
-      #' @description
-      #' Check if argument is a positive integer
+      # Check if argument is a positive integer
       is_positive_integer = function( x )
       {
           numeric <- is.numeric( x ) & is.finite( x ) & length( x ) == 1
@@ -422,8 +420,7 @@ Rasta <- R6::R6Class(
           return( TRUE )
       },
       
-      #' @description
-      #' Check alignment within each `SpatRaster` and consistency across all 
+      # Check alignment within each `SpatRaster` and consistency across all 
       check_rasters = function()
       {
           for ( method in names( private$suit_stack_list ) )
@@ -473,8 +470,7 @@ Rasta <- R6::R6Class(
           invisible( NULL )
       },
 
-      #' @description
-      #' Check that all layers within a SpatRaster are aligned
+      # Check that all layers within a SpatRaster are aligned
       check_alignment_within = function( stack, method )
       {
           if( terra::nlyr( stack ) > 1L )
@@ -501,8 +497,7 @@ Rasta <- R6::R6Class(
           invisible( NULL )
       },
 
-      #' @description
-      #' Check alignment among all SpatRasters in stacks
+      # Check alignment among all SpatRasters in stacks
       check_alignment_between = function()
       {
           if( length( private$suit_stack_list ) < 2L )
@@ -545,8 +540,7 @@ Rasta <- R6::R6Class(
 
       },
 
-      #' @description
-      #' Check that a new stack is aligned with existing stacks
+      # Check that a new stack is aligned with existing stacks
       check_alignment_with_existing = function( stack )
       {
           if( length( private$suit_stack_list ) == 0L)
@@ -577,8 +571,7 @@ Rasta <- R6::R6Class(
           invisible( NULL )
       },
 
-      #' @description
-      #' Check if method is known
+      # Check if method is known
       check_method = function( method )
       {
           if ( ! is.character( method ) )
@@ -595,15 +588,13 @@ Rasta <- R6::R6Class(
           return( TRUE )
       },
 
-      #' @description
-      #' Check if stack has `SpatRaster` labeled with `name`
+      # Check if stack has `SpatRaster` labeled with `name`
       has_raster = function( stack, name )
       {
           return( name %in% names( stack ) )
       },
 
-      #' @description
-      #' Check if stack has `SpatRaster` labeled with `name`
+      # Check if stack has `SpatRaster` labeled with `name`
       add_to_stack = function( stack, raster, name = NULL )
       {
           if( ! is.null( name ) ) names( raster ) <- name
@@ -611,8 +602,7 @@ Rasta <- R6::R6Class(
           return( c( stack, raster ) )
       },
       
-      #' @description
-      #' Get/set `SpatRasters` with mean suitability values
+      # Get/set `SpatRasters` with mean suitability values
       get_mean_suit_raster = function( method )
       {
           private$check_method( method )
@@ -633,9 +623,8 @@ Rasta <- R6::R6Class(
           return( private$mean_suit_stack[[ method ]] )
       },
 
-      #' @description
-      #' Get/set list of `SpatRasters` with per interval counts of suitability
-      #' values
+      # Get/set list of `SpatRasters` with per interval counts of suitability
+      # values
       get_count_stack = function( method )
       {
           private$check_method( method )
@@ -665,9 +654,8 @@ Rasta <- R6::R6Class(
           return( private$count_stack_list[[ method ]] )
       },
 
-      #' @description
-      #' Get/set list of `SpatRasters` with proportional counts of suitability
-      #' values
+      # Get/set list of `SpatRasters` with proportional counts of suitability
+      # values
       get_p_stack = function( method )
       {
           private$check_method( method )
@@ -681,9 +669,8 @@ Rasta <- R6::R6Class(
           return( private$p_stack_list[[ method]] )
       },
 
-      #' @description
-      #' Get/set list of `SpatRasters` with proportional counts of suitability
-      #' values
+      # Get/set list of `SpatRasters` with proportional counts of suitability
+      # values
       get_weight_denominator = function()
       {
           if( is.null( private$weight_denominator ) )
@@ -704,8 +691,7 @@ Rasta <- R6::R6Class(
           return( private$weight_denominator )
       },
       
-      #' @description
-      #' Set midpoints attribute
+      # Set midpoints attribute
       set_bins_dist_matrix = function()
       {
           bk <- private$breaks
@@ -728,8 +714,7 @@ Rasta <- R6::R6Class(
           invisible( NULL )
       },
 
-      #' @description
-      #' Set maximum theoretical Q value
+      # Set maximum theoretical Q value
       set_max_q = function()
       {
           private$max_q <- round( max( private$dist_matrix ) / 2, 2 )

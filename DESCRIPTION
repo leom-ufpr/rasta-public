@@ -1,7 +1,7 @@
 Package: Rasta
 Title: Ensemble learning using information theory
 Version: 0.1.0
-Authors@R: person("Your", "Name", email = "youremail@domain.com",
+Authors@R: person("My", "Name", email = "myname@email.com",
     role = c("aut", "cre"))
 Description: Ensemble learning using information theory.
 License: MIT + file LICENSE
@@ -11,19 +11,13 @@ Roxygen: list(markdown = TRUE)
 Imports:
     assertthat (>= 0.2.1),
     dplyr (>= 1.1.4),
-    doFuture(>= 1.1.2),
-    envnames (>= 0.2.1),
-    foreach (>= 1.5.2),
-    future(>= 1.68.0),
     magrittr (>= 2.0.4),
-    progressr (>= 0.18.0),
     R6 (>= 2.5.1),
     raster (>= 3.6.30),
-    Rfast (>= 2.1.0),
     terra (>= 1.8.86),
     tibble (>= 3.2.1)
 Suggests:
     testthat (>= 3.2.1.1)
 Config/testthat/edition: 2
 Config/devtools/load: source
-RoxygenNote: 7.3.3
+Config/roxygen2/version: 8.0.0
