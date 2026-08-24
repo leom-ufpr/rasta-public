@@ -11,7 +11,7 @@ create_toy_spatraster <- function(n_layers, n_cols = 10, n_rows = 10) {
     # Convert the matrix to a SpatRaster
     rasters[[i]] <- terra::rast(mat)
   }
-  return(terra::rast(rasters))
+  return(terra::stack(rasters))
 }
 
 test_that("Rasta constructor initializes correctly with valid arguments", {
@@ -245,6 +245,75 @@ test_that("Rasta constructor fails with SpatRasters having different CRS", {
 })
 
 test_that("Rasta constructor fails with suitability values outside [0, 1]", {
+  # Create toy SpatRasters
+  stack_1 <- create_toy_spatraster(5)
+  terra::values( stack_1[[ 1 ]] ) <- c(runif(99), -1)
+  
+  expect_error(Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    intervals = 10,
+    stacks = list(stack_1),
+    methods = c("ANN"),
+    threads = 1L,
+    .skip_checks = FALSE
+  ), regexp = "value outside \\[0, 1\\]")
+})
+
+# New tests for layer mismatch within a single SpatRaster
+
+test_that("Rasta constructor fails with layers having different extents within the same stack", {
+  # Create toy SpatRasters
+  stack_1 <- create_toy_spatraster(5)
+  stack_2 <- terra::crop(stack_1, terra::ext(stack_1)/2)
+  
+  expect_error(Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    intervals = 10,
+    stacks = list(stack_2),
+    methods = c("ANN"),
+    threads = 1L,
+    .skip_checks = FALSE
+   ), regexp = "\\[compareGeom\\] extents do not match" )
+})
+
+test_that("Rasta constructor fails with layers having different resolutions within the same stack", {
+  # Create toy SpatRasters
+  stack_1 <- create_toy_spatraster(5)
+  stack_2 <- terra::resample(stack_1, terra::res(stack_1) * 2)
+  
+  expect_error(Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    intervals = 10,
+    stacks = list(stack_2),
+    methods = c("ANN"),
+    threads = 1L,
+    .skip_checks = FALSE
+  ), regexp = "\\[compareGeom\\] number of rows and\\/or columns do not match" )
+})
+
+test_that("Rasta constructor fails with layers having different CRS within the same stack", {
+  # Create toy SpatRasters
+  stack_1 <- create_toy_spatraster( 5 )
+  terra::crs( stack_1[[ 1 ]] ) <- "EPSG:4326"
+    
+  stack_2 <- create_toy_spatraster( 5 )
+  terra::crs( stack_2[[ 1 ]] ) <- "EPSG:3857"
+  
+  expect_error(Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    intervals = 10,
+    stacks = list(stack_2),
+    methods = c("ANN"),
+    threads = 1L,
+    .skip_checks = FALSE
+  ),regexp = "\\[compareGeom\\] CRS do not match" )
+})
+
+test_that("Rasta constructor fails with suitability values outside [0, 1] within the same stack", {
   # Create toy SpatRasters
   stack_1 <- create_toy_spatraster(5)
   terra::values( stack_1[[ 1 ]] ) <- c(runif(99), -1)
