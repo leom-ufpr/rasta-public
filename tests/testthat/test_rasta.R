@@ -496,6 +496,10 @@ test_that("private$dist_matrix is correctly instantiated with default intervals"
   
   # Check if off-diagonal elements match expected values
   expect_equal(dist_matrix, expected_dist_matrix)
+
+  # Check max_q
+  expect_equal(obj$test_private("max_q"), 0.45)
+
 })
 
 test_that("private$dist_matrix is correctly instantiated with custom intervals", {
@@ -540,4 +544,9 @@ test_that("private$dist_matrix is correctly instantiated with custom intervals",
   
   # Check if off-diagonal elements match expected values
   expect_equal(dist_matrix, expected_dist_matrix)
+
+  # Check max_q
+  expect_equal(obj$test_private("max_q"), 0.40)
 })
+
+
