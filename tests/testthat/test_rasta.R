@@ -353,3 +353,33 @@ test_that("Rasta constructor rounds cell values to 3 decimal places", {
   values <- terra::values(suit_stack_list[[2]])
   expect_true(base::all(round(values, 3) == values,na.rm = TRUE))
 })
+
+# New test for get_mean_suit_raster
+
+test_that("get_mean_suit_raster returns a SpatRaster with mean suitability values", {
+  # Create toy SpatRasters
+  stack_1 <- create_toy_spatraster(5)
+  stack_2 <- create_toy_spatraster(5)
+  
+  # Initialize Rasta object
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    stacks = list(stack_1, stack_2),
+    methods = c("ANN", "GLM"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+  
+  # Get mean suitability raster for method "ANN"
+  mean_suit_raster <- obj$get_mean_suit_raster("ANN")
+  
+  # Check if the returned object is a SpatRaster
+  expect_is(mean_suit_raster, "SpatRaster")
+  
+  # Check if the number of layers in the mean suitability raster is 1
+  expect_equal(terra::nlyr(mean_suit_raster), 1)
+  
+  # Check if the extent and resolution of the mean suitability raster match those of the input stacks
+  expect_true(terra::compareGeom(stack_1, mean_suit_raster, stopOnError = FALSE)$equal)
+})
