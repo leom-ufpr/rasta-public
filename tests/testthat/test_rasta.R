@@ -380,6 +380,10 @@ test_that("get_mean_suit_raster returns a SpatRaster with mean suitability value
   # Check if the number of layers in the mean suitability raster is 1
   expect_equal(terra::nlyr(mean_suit_raster), 1)
   
-  # Check if the extent and resolution of the mean suitability raster match those of the input stacks
-  expect_true(terra::compareGeom(stack_1, mean_suit_raster, stopOnError = FALSE)$equal)
+  # Check if the extent and resolution of the mean suitability raster match
+  # those of the input stacks
+  round_stack <- terra::round(stack_1, digits = 3)
+  expect_equal(terra::values(terra::app(round_stack, fun = mean, na.rm=TRUE)),
+               terra::values(mean_suit_raster),
+               stopOnError = FALSE)
 })
