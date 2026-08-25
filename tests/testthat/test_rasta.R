@@ -96,6 +96,7 @@ test_that("Rasta constructor fails with invalid stacks argument", {
     class = "test_class",
     replicates = 5,
     intervals = 10,
+    stacks = list(stack_1, stack_2),
     methods = c("ANN", "GLM"),
     threads = 1L,
     .skip_checks = FALSE
@@ -386,4 +387,67 @@ test_that("get_mean_suit_raster returns a SpatRaster with mean suitability value
   expect_equal(terra::values(terra::app(round_stack, fun = mean, na.rm=TRUE)),
                terra::values(mean_suit_raster),
                stopOnError = FALSE)
+})
+
+# New test to verify if private$bins is correctly instantiated
+
+test_that("private$bins is correctly instantiated with default intervals", {
+  # Create toy SpatRasters
+  stack_1 <- create_toy_spatraster(5)
+  stack_2 <- create_toy_spatraster(5)
+  
+  # Initialize Rasta object with default intervals (10L)
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    stacks = list(stack_1, stack_2),
+    methods = c("ANN", "GLM"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+  
+  # Get private$bins using the accessor function
+  bins <- obj$test_private("bins")
+  
+  # Check if bins is a matrix with 2 columns and 11 rows
+  expect_is(bins, "matrix")
+  expect_equal(ncol(bins), 2)
+  expect_equal(nrow(bins), 11)
+  
+  # Check the values in the first row
+  expect_equal(bins[1, ], c(0, 0.1))
+  
+  # Check the values in the last row
+  expect_equal(bins[nrow(bins), ], c(0.9, 1 + .Machine$double.eps))
+})
+
+test_that("private$bins is correctly instantiated with custom intervals", {
+  # Create toy SpatRasters
+  stack_1 <- create_toy_spatraster(5)
+  stack_2 <- create_toy_spatraster(5)
+  
+  # Initialize Rasta object with custom intervals (5L)
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    intervals = 5L,
+    stacks = list(stack_1, stack_2),
+    methods = c("ANN", "GLM"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+  
+  # Get private$bins using the accessor function
+  bins <- obj$test_private("bins")
+  
+  # Check if bins is a matrix with 2 columns and 6 rows
+  expect_is(bins, "matrix")
+  expect_equal(ncol(bins), 2)
+  expect_equal(nrow(bins), 6)
+  
+  # Check the values in the first row
+  expect_equal(bins[1, ], c(0, 0.2))
+  
+  # Check the values in the last row
+  expect_equal(bins[nrow(bins), ], c(0.8, 1 + .Machine$double.eps))
 })
