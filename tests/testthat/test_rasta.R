@@ -549,4 +549,44 @@ test_that("private$dist_matrix is correctly instantiated with custom intervals",
   expect_equal(obj$test_private("max_q"), 0.40)
 })
 
+# New test to verify if private$get_count_stack is correctly instantiated
 
+test_that("private$get_count_stack returns correct count stack", {
+  # Create toy SpatRasters with specific values for testing
+  n_layers <- 10
+  n_cols <- 10
+  n_rows <- 10
+  
+  # Define specific values for each layer in the first pixel
+  values <- matrix(0, nrow = n_layers, ncol = 1)
+  values[1:2, ] <- 0.05  # 2 layers with value between 0.0-0.1
+  values[3:7, ] <- 0.15  # 5 layers with value between 0.1-0.2
+  values[8:10,] <- 0.25  # 3 layers with value between 0.2-0.3
+  
+  # Create a SpatRaster with these specific values
+  stack_1 <- terra::rast(values)
+  
+  # Initialize Rasta object with default intervals (10L)
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = n_layers,
+    stacks = list(stack_1),
+    methods = c("ANN"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+  
+  # Get private$count_stack using the accessor function
+  count_stack <- obj$test_private("get_count_stack", args = list(method = "ANN"))
+  
+  # Check if count_stack is a SpatRaster with correct dimensions
+  expect_is(count_stack, "SpatRaster")
+  expect_equal(terra::nlyr(count_stack), n_layers)
+  expect_equal(terra::ncol(count_stack), n_cols)
+  expect_equal(terra::nrow(count_stack), n_rows)
+  
+  # Check if the first pixel has correct counts in each layer
+  expected_counts <- c(2, 5, 3, rep(0, n_layers - 3))
+  actual_counts <- terra::values(count_stack)[1, ]
+  expect_equal(actual_counts, expected_counts)
+})
