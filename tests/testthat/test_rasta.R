@@ -1,4 +1,6 @@
 library(testthat)
+
+library(magrittr)
 library(R6)
 library(terra)
 
@@ -342,8 +344,12 @@ test_that("Rasta constructor rounds cell values to 3 decimal places", {
   )
   
   # Extract values from the SpatRaster
-  values <- terra::values(obj$private$suit_stack_list$ANN)
-  
+  suit_stack_list <- obj$test_private("suit_stack_list")
+  values <- terra::values(suit_stack_list[[1]])
+
   # Check if values are rounded to 3 decimal places
-  expect_true(all(round(values, 3) == values))
+  expect_true(base::all(round(values, 3) == values,na.rm = TRUE))
+
+  values <- terra::values(suit_stack_list[[2]])
+  expect_true(base::all(round(values, 3) == values,na.rm = TRUE))
 })
