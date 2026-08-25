@@ -91,12 +91,13 @@ test_that("Rasta constructor fails with low replicates argument", {
 test_that("Rasta constructor fails with invalid stacks argument", {
   # Create toy SpatRasters
   stack_1 <- create_toy_spatraster(5)
+  stack_2 <- create_toy_spatraster(5)
   
   expect_error(Rasta$new(
     class = "test_class",
     replicates = 5,
     intervals = 10,
-    stacks = list(stack_1, stack_2),
+    stacks = c(stack_1, stack_2),
     methods = c("ANN", "GLM"),
     threads = 1L,
     .skip_checks = FALSE
@@ -412,7 +413,7 @@ test_that("private$bins is correctly instantiated with default intervals", {
   # Check if bins is a matrix with 2 columns and 11 rows
   expect_is(bins, "matrix")
   expect_equal(ncol(bins), 2)
-  expect_equal(nrow(bins), 11)
+  expect_equal(nrow(bins), 10)
   
   # Check the values in the first row
   expect_equal(bins[1, ], c(0, 0.1))
@@ -443,7 +444,7 @@ test_that("private$bins is correctly instantiated with custom intervals", {
   # Check if bins is a matrix with 2 columns and 6 rows
   expect_is(bins, "matrix")
   expect_equal(ncol(bins), 2)
-  expect_equal(nrow(bins), 6)
+  expect_equal(nrow(bins), 5)
   
   # Check the values in the first row
   expect_equal(bins[1, ], c(0, 0.2))
@@ -451,3 +452,4 @@ test_that("private$bins is correctly instantiated with custom intervals", {
   # Check the values in the last row
   expect_equal(bins[nrow(bins), ], c(0.8, 1 + .Machine$double.eps))
 })
+
