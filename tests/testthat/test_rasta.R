@@ -453,3 +453,91 @@ test_that("private$bins is correctly instantiated with custom intervals", {
   expect_equal(bins[nrow(bins), ], c(0.8, 1 + .Machine$double.eps))
 })
 
+# New test to verify if private$dist_matrix is correctly instantiated
+
+test_that("private$dist_matrix is correctly instantiated with default intervals", {
+  # Create toy SpatRasters
+  stack_1 <- create_toy_spatraster(5)
+  stack_2 <- create_toy_spatraster(5)
+  
+  # Initialize Rasta object with default intervals (10L)
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    stacks = list(stack_1, stack_2),
+    methods = c("ANN", "GLM"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+  
+  # Get private$bins using the accessor function
+  bins <- obj$test_private("bins")
+  
+  # Calculate expected midpoints
+  midpoints <- (bins[,1] + bins[,2]) / 2
+  
+  # Calculate expected dist_matrix
+  K <- length(midpoints)
+  grid <- tidyr::expand_grid(i = c(1:K), j = c(1:K))
+  dist_vector <- abs(midpoints[grid$j] - midpoints[grid$i])
+  expected_dist_matrix <- matrix(dist_vector, ncol = K)
+  
+  # Get private$dist_matrix using the accessor function
+  dist_matrix <- obj$test_private("dist_matrix")
+  
+  # Check if dist_matrix is a matrix with correct dimensions
+  expect_is(dist_matrix, "matrix")
+  expect_equal(ncol(dist_matrix), K)
+  expect_equal(nrow(dist_matrix), K)
+  
+  # Check if diagonal elements are zero
+  diag_elements <- diag(dist_matrix)
+  expect_true(all(diag_elements == 0))
+  
+  # Check if off-diagonal elements match expected values
+  expect_equal(dist_matrix, expected_dist_matrix)
+})
+
+test_that("private$dist_matrix is correctly instantiated with custom intervals", {
+  # Create toy SpatRasters
+  stack_1 <- create_toy_spatraster(5)
+  stack_2 <- create_toy_spatraster(5)
+  
+  # Initialize Rasta object with custom intervals (5L)
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    intervals = 5L,
+    stacks = list(stack_1, stack_2),
+    methods = c("ANN", "GLM"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+  
+  # Get private$bins using the accessor function
+  bins <- obj$test_private("bins")
+  
+  # Calculate expected midpoints
+  midpoints <- (bins[,1] + bins[,2]) / 2
+  
+  # Calculate expected dist_matrix
+  K <- length(midpoints)
+  grid <- tidyr::expand_grid(i = c(1:K), j = c(1:K))
+  dist_vector <- abs(midpoints[grid$j] - midpoints[grid$i])
+  expected_dist_matrix <- matrix(dist_vector, ncol = K)
+  
+  # Get private$dist_matrix using the accessor function
+  dist_matrix <- obj$test_private("dist_matrix")
+  
+  # Check if dist_matrix is a matrix with correct dimensions
+  expect_is(dist_matrix, "matrix")
+  expect_equal(ncol(dist_matrix), K)
+  expect_equal(nrow(dist_matrix), K)
+  
+  # Check if diagonal elements are zero
+  diag_elements <- diag(dist_matrix)
+  expect_true(all(diag_elements == 0))
+  
+  # Check if off-diagonal elements match expected values
+  expect_equal(dist_matrix, expected_dist_matrix)
+})
