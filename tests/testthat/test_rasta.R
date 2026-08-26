@@ -8,9 +8,11 @@ library(terra)
 create_toy_spatraster <- function(n_layers, n_cols = 10, n_rows = 10) {
   rasters <- vector("list", n_layers)
   for (i in seq_len(n_layers)) {
-    # Create a matrix of random values with some NA values
-    mat <- matrix(runif(n_cols * n_rows), nrow = n_rows, ncol = n_cols)
-    mat[sample(1:(n_cols * n_rows), size = 5)] <- NA
+    # Create a matrix of random values with specific ranges
+    vec <- c(stats::runif(30, min = 0.00, max = 0.09),
+             stats::runif(50, min = 0.10, max = 0.19),
+             stats::runif(20, min = 0.20, max = 0.29))
+    mat <- base::matrix(vec, nrow = n_rows, ncol = n_cols)
     # Convert the matrix to a SpatRaster
     rasters[[i]] <- terra::rast(mat)
   }
