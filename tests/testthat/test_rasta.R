@@ -4,19 +4,39 @@ library(magrittr)
 library(R6)
 library(terra)
 
-# Helper function to create a toy SpatRaster
-create_toy_spatraster <- function(n_layers, n_cols = 10, n_rows = 10) {
+# Helper function to create a single layer SpatRaster
+create_raster <- function(vector, n_cols = 10, n_rows = 10) {
+    mat <- base::matrix(vector, nrow = n_rows, ncol = n_cols)
+    return(terra::rast(mat))
+}
+
+# Helper function to create a multiayer SpatRaster
+create_stack <- function(n_layers, raster) {
   rasters <- vector("list", n_layers)
   for (i in seq_len(n_layers)) {
-    # Create a matrix of random values with specific ranges
-    vec <- c(stats::runif(30, min = 0.00, max = 0.09),
-             stats::runif(50, min = 0.10, max = 0.19),
-             stats::runif(20, min = 0.20, max = 0.29))
-    mat <- base::matrix(vec, nrow = n_rows, ncol = n_cols)
-    # Convert the matrix to a SpatRaster
-    rasters[[i]] <- terra::rast(mat)
+    rasters[[i]] <- raster
   }
   return(terra::rast(rasters))
+}
+
+# Helper function to create standard toy SpatRaster
+create_toy_spatraster <- function(n_layers, n_cols = 10, n_rows = 10) {
+  # Create a vector of random values with specific ranges
+  vec <- c(stats::runif(30, min = 0.00, max = 0.09),
+           stats::runif(50, min = 0.10, max = 0.19),
+           stats::runif(20, min = 0.20, max = 0.29))
+
+  # Raster from vector  
+  raster <- create_raster(vector = vec, n_cols = n_cols, n_rows = n_rows)
+
+  # Return stack with given number of identical layers  
+  return(create_stack(n_layers, raster))
+}
+
+new_from_template <- function(ref_raster, vector) {
+  raster <- terra::deepcopy(ref_raster)
+  values(raster) <- vector
+  return(raster)
 }
 
 test_that("Rasta constructor initializes correctly with valid arguments", {
@@ -553,25 +573,14 @@ test_that("private$dist_matrix is correctly instantiated with custom intervals",
 
 # New test to verify if private$get_count_stack is correctly instantiated
 
-test_that("private$get_count_stack returns correct count stack", {
-  # Create toy SpatRasters with specific values for testing
-  n_layers <- 10
-  n_cols <- 10
-  n_rows <- 10
-  
-  # Define specific values for each layer in the first pixel
-  values <- matrix(0, nrow = n_layers, ncol = 1)
-  values[1:2, ] <- 0.05  # 2 layers with value between 0.0-0.1
-  values[3:7, ] <- 0.15  # 5 layers with value between 0.1-0.2
-  values[8:10,] <- 0.25  # 3 layers with value between 0.2-0.3
-  
+test_that("private$get_count_stack and private$get_p_stack returns correct count stack with default intervals", {
   # Create a SpatRaster with these specific values
-  stack_1 <- terra::rast(values)
+  stack_1 <- create_toy_spatraster(5)
   
   # Initialize Rasta object with default intervals (10L)
   obj <- Rasta$new(
     class = "test_class",
-    replicates = n_layers,
+    replicates = 5,
     stacks = list(stack_1),
     methods = c("ANN"),
     threads = 1L,
@@ -579,16 +588,169 @@ test_that("private$get_count_stack returns correct count stack", {
   )
   
   # Get private$count_stack using the accessor function
-  count_stack <- obj$test_private("get_count_stack", args = list(method = "ANN"))
-  
+  count_stack <- obj$test_private( "get_count_stack",
+                                   tag = "function",
+                                   args = list("ANN"))
+
   # Check if count_stack is a SpatRaster with correct dimensions
   expect_is(count_stack, "SpatRaster")
-  expect_equal(terra::nlyr(count_stack), n_layers)
-  expect_equal(terra::ncol(count_stack), n_cols)
-  expect_equal(terra::nrow(count_stack), n_rows)
+  expect_equal(terra::nlyr(count_stack), obj$intervals)
+
+  raster <- vector(mode = "list", length = obj$intervals)
+  raster[[1]] <- new_from_template(ref_raster = stack_1[[1]],
+                                   vector = c(rep(5,30), rep(0,70)))
+  raster[[2]] <- new_from_template(ref_raster = raster[[1]],
+                                   vector = c(rep(0,30), rep(5,50), rep(0,20)))
+  raster[[3]] <- new_from_template(ref_raster = raster[[1]],
+                                   vector = c(rep(0,80), rep(5,20)))
   
   # Check if the first pixel has correct counts in each layer
-  expected_counts <- c(2, 5, 3, rep(0, n_layers - 3))
-  actual_counts <- terra::values(count_stack)[1, ]
-  expect_equal(actual_counts, expected_counts)
+  for( i in 4:10L ) {
+      raster[[i]] <- new_from_template(raster[[1]], c(rep(0,100)))
+  }      
+
+  exp_stack <- terra::rast(raster)
+  expect_equal(exp_stack, count_stack)
+
+  # Initialize Rasta object with default intervals (10L)
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    stacks = list(stack_1),
+    methods = c("ANN"),
+    threads = 1L,
+    .skip_checks = FALSE
+   )
+
+  p_stack <- obj$test_private( "get_p_stack",
+                               tag = "function",
+                               args = list("ANN"))
+
+  expect_equal(exp_stack/obj$replicates, p_stack)
+})
+
+test_that("private$get_count_stack and private$get_p_stack return correct count stack with intervals=5L", {
+  # Create a SpatRaster with these specific values
+  stack_1 <- create_toy_spatraster(5)
+  
+  # Initialize Rasta object with default intervals (10L)
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    intervals = 5,
+    stacks = list(stack_1),
+    methods = c("ANN"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+  
+  # Get private$count_stack using the accessor function
+  count_stack <- obj$test_private( "get_count_stack",
+                                   tag = "function",
+                                   args = list("ANN"))
+
+  # Check if count_stack is a SpatRaster with correct dimensions
+  expect_is(count_stack, "SpatRaster")
+  expect_equal(terra::nlyr(count_stack), obj$intervals)
+
+  raster <- vector(mode = "list", length = obj$intervals)
+  raster[[1]] <- new_from_template(ref_raster = stack_1[[1]],
+                                   vector = c(rep(5,80), rep(0,20)))
+  raster[[2]] <- new_from_template(ref_raster = raster[[1]],
+                                   vector = c(rep(0,80), rep(5,20)))
+  
+  # Check if the first pixel has correct counts in each layer
+  for( i in 3:5 ) {
+      raster[[i]] <- new_from_template(raster[[1]], c(rep(0,100)))
+  }      
+
+  exp_stack <- terra::rast(raster)
+  expect_equal(exp_stack, count_stack)
+
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    intervals = 5,
+    stacks = list(stack_1),
+    methods = c("ANN"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+  
+  p_stack <- obj$test_private("get_p_stack",
+                              tag = "function",
+                              args = list("ANN"))
+
+  expect_equal(exp_stack/obj$replicates, p_stack)
+})
+
+test_that("self$get_entropy_raster is all 0 for standard object", {
+  # Create a SpatRaster with these specific values
+  stack_1 <- create_toy_spatraster(5)
+  stack_2 <- create_toy_spatraster(5)
+  
+  # Initialize Rasta object with default intervals (10L)
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    intervals = 5,
+    stacks = list(stack_1,stack_2),
+    methods = c("ANN","GLM"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+
+  exp_raster <- new_from_template(stack_1[[1]], c(rep(0,100)))
+  names(exp_raster) <- "ANN"
+  q_raster <- obj$get_entropy_raster("ANN")
+  expect_equal(terra::values(exp_raster), terra::values(q_raster))
+
+  exp_raster <- new_from_template(stack_1[[2]], c(rep(0,100)))
+  names(exp_raster) <- "GLM"
+  q_raster <- obj$get_entropy_raster("GLM")
+  expect_equal(terra::values(exp_raster), terra::values(q_raster))
+})
+
+test_that("self$get_entropy_raster varies as expected for custom object", {
+
+  vec <- c(stats::runif(30, min = 0.00, max = 0.09),
+           stats::runif(30, min = 0.10, max = 0.19),
+           rep( 10, NA ),
+           stats::runif(30, min = 0.20, max = 0.29))
+
+  raster <- create_raster(vec)
+  stack_1 <- create_stack(nlyr = 3, raster = raster)
+  
+  vec <- c(stats::runif(30, min = 0.90, max = 1.00),
+           stats::runif(30, min = 0.80, max = 0.89),
+           rep( 10, NA ),
+           stats::runif(30, min = 0.20, max = 0.29))
+
+  raster <- create_raster(vec)
+  stack_2 <- create_stack(nlyr = 3, raster = raster)
+
+  terra::add( stack_1 ) <- stack_2
+
+    
+  # Initialize Rasta object with default intervals (10L)
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 5,
+    intervals = 5,
+    stacks = list(stack_1),
+    methods = c("ANN"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+
+  exp_vec <- c(rep(30, 1),
+               rep(0.5*0.5*
+               rep(10, NA),
+               rep(30, 0) )
+  
+  exp_raster <- new_from_template(stack_1[[1]], c(rep(0,100)))
+  names(exp_raster) <- "ANN"
+  q_raster <- obj$get_entropy_raster("ANN")
+  expect_equal(terra::values(exp_raster), terra::values(q_raster))
+
 })

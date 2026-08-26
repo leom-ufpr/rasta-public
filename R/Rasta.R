@@ -30,10 +30,7 @@ Rasta <- R6::R6Class(
 
     #' @field threads Number of threads for parallelized operations
     threads = NULL,
-
-    #' @field entropy_stack Stack with Rao's (Q) entropy rasters
-    entropy_stack = c(),
-
+    
     #' @field .skip_checks Used for internal object instatiation.
     .skip_checks = FALSE,
     
@@ -68,7 +65,7 @@ Rasta <- R6::R6Class(
         {
             stop( "`replicates` attribute is mandatory and must be provided." )
         }
-        if( ! is.character( class ) || length( class ) != 1 )
+        if( ! is.character( class ) | length( class ) != 1 )
         {
             stop( "`class` must be a single character string." )
         }
@@ -119,7 +116,7 @@ Rasta <- R6::R6Class(
         }
 
         # Validate .skip_checks argument
-        if ( ! is.logical( .skip_checks ) || length( .skip_checks ) != 1L )
+        if ( ! is.logical( .skip_checks ) | length( .skip_checks ) != 1L )
         {
             stop( ".skip_checks must be a single logical value." )
         }
@@ -184,28 +181,56 @@ Rasta <- R6::R6Class(
     {
         private$check_method( method )
 
-        if ( ! check_stack( private$entropy_stack, method ) )
+        if ( ! private$has_raster( "entropy_stack", method ) )
         {
             p <- private$get_p_stack( method )
             d <- private$dist_matrix
             m <- private$max_q
 
-            Qr <- terra::app (
-                p_stack,
-                fun = function(x)
+            Qr <- terra::app(
+                p,
+                fun = function( x )
                 {
-                    t( x ) %*% dist_matrix %*% x %>%
+                    t( x ) %*% d %*% x %>%
                         as.numeric(.) / m
                 }
             )
 
-            private$entropy_stack <- private$add_stack( private$entropy_stack,
-                                                        Qr,
-                                                        method )
+            private$add_to_stack( "entropy_stack", Qr, method )
         }
 
-        return( private$entropy_raster_list[[ method ]] )
+        return( private$entropy_stack[[ method ]] )
     },
+    
+    #' @description
+    #' Get the mean suitability raster, i.e., the raster with the mean suitability
+    #' values computed across the multilayer suitability `SpatRasters` for the
+    #' method passed as argument to the function
+    #'
+    #' @param method Character string. Name of the ENM method.
+    #'  
+    #' @return A `SpatRaster` with mean suitability values.
+    get_mean_suit_raster = function( method )
+    {
+        private$check_method( method )
+
+        add_mean_suit_raster <- length( private$mean_suit_stack ) == 0 |
+            ! private$has_raster( "mean_suit_stack", method )
+
+        if ( add_mean_suit_raster )
+        {
+            suit_stack <- private$suit_stack_list[[ method ]]
+
+            mean_suit_raster <- terra::app( suit_stack,
+                                            fun = "mean",
+                                            na.rm = TRUE )
+            
+            private$mean_suit_stack[[ method ]] <- mean_suit_raster
+        }
+
+        return( private$mean_suit_stack[[ method ]] )
+    },
+    
 
     #' @description
     #' Get the weight raster for a given method
@@ -217,16 +242,14 @@ Rasta <- R6::R6Class(
     {
         private$check_method( method )
         
-        if ( ! check_stack( private$weight_stack, method ) )
+        if ( ! private$has_raster( "weight_stack", method ) )
         {
             weight_numerator <- 1 - private$get_entropy_raster( method )
             weight_denominator <- private$get_weight_denominator()
             
             weigth_raster <- weight_numerator/weight_denominator
             
-            private$weight_stack <- private$add_stack( private$weight_stack,
-                                                       weight_raster,
-                                                       method )
+            private$add_to_stack( "weight_stack", weight_raster, method )
         }
 
         return( private$weight_stack[[ method ]] )
@@ -322,7 +345,7 @@ Rasta <- R6::R6Class(
     {
         private$check_method( method )
 
-        if ( ! private$is_positive_integer( reps ) || reps < 2L )
+        if ( ! private$is_positive_integer( reps ) | reps < 2L )
         {
             stop( "`reps` must be a positive integer greater than or equal to 2." )
         }
@@ -364,6 +387,32 @@ Rasta <- R6::R6Class(
         }
 
         return( results )
+    },
+
+    test_private = function( name = NULL, tag = "attrb", args = list() )
+    {
+        base::stopifnot( base::is.character( name ) )
+        base::stopifnot( base::is.character( tag ) )
+        base::stopifnot( base::is.list( args ) )
+        base::stopifnot( tag %in% c( "attrb", "function" ) )
+
+        if( name %in% names( private ) )
+        {
+            if( tag == "attrb" )
+            {
+                return( private[[ name ]] )
+            }
+            else
+            {
+                return( base::do.call( private[[ name ]], args ) )
+            }
+        }
+        else 
+        {
+            warning( base::paste( "Method", name, "not found" ) )
+        }
+
+        invisible( NULL )        
     }
   ),
 
@@ -390,14 +439,18 @@ Rasta <- R6::R6Class(
       # p_stack_list List that stores `SpatRaster`stacks with
       # proportional suitability counts
       p_stack_list = list(),
+
+      # entropy_stack Stack that stores lazily built rasters with entropy
+      # values for each method
+      entropy_stack = NULL,
       
       # mean_suit_stack Stack that stores lazily built rasters with mean
       # suitability values for each method
-      mean_suit_stack = c(),
+      mean_suit_stack = NULL,
 
       # weight_stack Stack that stores weight rasters used in
       # weighted mean suitability computation
-      weight_stack = c(),
+      weight_stack = NULL,
 
       # weight_denominator Raster that stores denominator used in weight
       # computation
@@ -432,7 +485,7 @@ Rasta <- R6::R6Class(
 
               # Round values to 3 decimal digits
               stack <- terra::round( stack, digits = 3 )
-
+              
               limits <- terra::global( stack,
                                        fun = c( "min", "max" ),
                                        na.rm = TRUE )
@@ -460,6 +513,8 @@ Rasta <- R6::R6Class(
                        " layers but expected ",
                        self$replicates, "." )
               }
+              
+              private$suit_stack_list[[ method ]] <- stack
           }
 
           if( length( private$suit_stack_list ) > 1L )
@@ -538,30 +593,33 @@ Rasta <- R6::R6Class(
       },
 
       # Check if stack has `SpatRaster` labeled with `name`
-      has_raster = function( stack, name )
+      has_raster = function( stack, method )
       {
-          return( name %in% names( stack ) )
-      },
-      
-      # Get/set `SpatRasters` with mean suitability values
-      get_mean_suit_raster = function( method )
-      {
-          private$check_method( method )
-
-          if ( ! has_raster( private$mean_suit_stack, method ) )
+          if ( is.null( private[[ stack ]] ) )
           {
-              suit_stack <- private$suit_stack[[ method ]]
+              return( FALSE )
+          }
+          else
+          {
+              return( method %in% names( private[[ stack ]] ) )
+          }
+      },
 
-              mean_suit_raster <- terra::app( suit_stack,
-                                              fun = "mean",
-                                              na.rm = TRUE )
-                                             
-              private$mean_suit_stack <- private$add_stack( private$mean_suit_stack,
-                                                            mean_suit_raster,
-                                                            method )
+      # Add `SpatRaster` to stack
+      add_to_stack = function( stack, raster, method )
+      {
+          names( raster ) <- method
+
+          if( is.null( private[[ stack ]] ) )
+          {
+              private[[ stack ]] <- raster
+          }
+          else
+          {
+              terra::add( private[[ stack ]] ) <- raster
           }
 
-          return( private$mean_suit_stack[[ method ]] )
+          invisible( NULL )
       },
 
       # Get/set list of `SpatRasters` with per interval counts of suitability
@@ -572,7 +630,7 @@ Rasta <- R6::R6Class(
 
           if ( is.null( private$count_stack_list[[ method ]] ) )
           {
-              suit_stack <- private$suit_stack[[ method ]]
+              suit_stack <- private$suit_stack_list[[ method ]]
               b <- private$bins
               count_stack <- c()
 
@@ -589,7 +647,7 @@ Rasta <- R6::R6Class(
                   count_stack <- c( count_stack, count_raster )
               }
               
-              private$count_stack_list[[ method ]] <- count_stack
+              private$count_stack_list[[ method ]] <- terra::rast( count_stack )
           }
 
           return( private$count_stack_list[[ method ]] )
@@ -603,7 +661,7 @@ Rasta <- R6::R6Class(
 
           if ( is.null( private$p_stack_list[[ method ]] ) )
           {
-              count_stack <- private$count_stack_list[[ method ]]
+              count_stack <- private$get_count_stack( method )
               private$p_stack_list[[ method ]] <- count_stack / self$replicates
           }
 
