@@ -191,8 +191,16 @@ Rasta <- R6::R6Class(
                 p,
                 fun = function( x )
                 {
-                    t( x ) %*% d %*% x %>%
-                        as.numeric(.) / m
+                    if ( anyNA( x ) )
+                    {
+                        return( NA_real_ )
+                    }
+                    else
+                    {
+                        t( x ) %*% d %*% x %>%
+                            as.numeric(.) / m %>%
+                            return(.)
+                    }
                 }
             )
 
@@ -244,12 +252,12 @@ Rasta <- R6::R6Class(
         
         if ( ! private$has_raster( "weight_stack", method ) )
         {
-            weight_numerator <- 1 - private$get_entropy_raster( method )
+            weight_numerator <- 1 - self$get_entropy_raster( method )
             weight_denominator <- private$get_weight_denominator()
             
             weigth_raster <- weight_numerator/weight_denominator
             
-            private$add_to_stack( "weight_stack", weight_raster, method )
+            private$add_to_stack( "weight_stack", weigth_raster, method )
         }
 
         return( private$weight_stack[[ method ]] )
@@ -263,22 +271,14 @@ Rasta <- R6::R6Class(
     {
         if ( is.null( private$wgt_ensemble_raster ) )
         {
-            wgt_ensemble_raster <- NULL
+            wgt_ensemble_raster <- 0
             
             for( method in self$methods )
             {
                 mean_suit_raster <- self$get_mean_suit_raster( method )
                 weight_raster <- self$get_weight_raster( method )
                 wgt_method_raster <- mean_suit_raster * weight_raster
-
-                if( is.null( wgt_ensemble_raster ) )
-                {
-                    wgt_ensemble_raster <- wgt_method_raster
-                }
-                else
-                {
-                    wgt_ensemble_raster <- wgt_ensemble_raster + wgt_method_raster
-                }
+                wgt_ensemble_raster <- wgt_ensemble_raster + wgt_method_raster
             }
 
             private$wgt_ensemble_raster <- wgt_ensemble_raster
@@ -294,26 +294,29 @@ Rasta <- R6::R6Class(
     #' @return A `SpatRaster` with efficiency values.
     get_efficiency_raster = function()
     {
-        efficiency_raster <- NULL
-        max_entropy <- log( length( self$methods ) )
-        
-        for( method in self$methods )
-        {
-            weight_raster <- self$get_weight_raster( method )
-            summand <- weight_raster * log( weight_raster ) * (-1)
-            
-            if( is.null( efficiency_raster ) )
-            {
-                efficiency_raster <- summand
-            }
-            else
-            {
-                efficiency_raster <- efficiency_raster + summand
-            }
+        max_h <- log( length( self$methods ) )
 
-            private$efficiency_raster <- efficiency_raster / max_entropy
+        if( is.null( private$weight_stack ) )
+        {
+            for( method in self$methods )
+            {
+                self$get_weight_raster( method )
+            }
         }
 
+        w <- private$weight_stack
+
+        Hr <- terra::app(
+            w,
+            fun = function( x )
+            {
+                y <- x[ x > 0 ]
+                sum( y * log( y ) )
+            }
+        )
+
+        private$efficiency_raster <- Hr / max_h * (-1)
+        
         return( private$efficiency_raster )
     },
 
@@ -328,9 +331,11 @@ Rasta <- R6::R6Class(
         private$check_method( method )
 
         entropy_raster <- self$get_entropy_raster( method )
-        mean_entropy <- terra::global( entropy_raster, fun = "mean", na.rm = TRUE )
+        mean_entropy <- terra::global( entropy_raster,
+                                       fun = "mean",
+                                       na.rm = TRUE )
 
-        return( mean_entropy )
+        return( as.numeric( mean_entropy ) )
     },
 
     #' @description
@@ -640,7 +645,15 @@ Rasta <- R6::R6Class(
                       suit_stack,
                       function( x )
                       {
-                          sum( x >= b[ l, 1 ] & x < b[ l, 2 ], na.rm = TRUE )
+                          if ( anyNA( x ) )
+                          {
+                              return( NA_real_ )
+                          }
+                          else
+                          {
+                              sum( x >= b[ l, 1 ] & x < b[ l, 2 ] ) %>%
+                                  return(.)
+                          }
                       }
                   )
 
@@ -676,13 +689,13 @@ Rasta <- R6::R6Class(
           {
               Qs <- c()
 
-              for( method in self$methods() )
+              for( method in self$methods )
               {
                   Qs <- c( Qs, self$get_entropy_raster( method ) )
               }
 
               M <- length( self$methods )
-              private$weight_denominator <- M - terra::app( Qs,
+              private$weight_denominator <- M - terra::app( terra::rast(Qs),
                                                             fun = "sum",
                                                             na.rm = TRUE )
           }

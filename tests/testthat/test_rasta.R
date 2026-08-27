@@ -39,6 +39,12 @@ new_from_template <- function(ref_raster, vector) {
   return(raster)
 }
 
+compare_raster_data <- function(raster_1, raster_2)
+{
+    expect_equal(terra::values(raster_1) %>% as.numeric(),
+                 terra::values(raster_2) %>% as.numeric())
+}
+
 test_that("Rasta constructor initializes correctly with valid arguments", {
   # Create toy SpatRasters
   stack_1 <- create_toy_spatraster(5)
@@ -703,54 +709,326 @@ test_that("self$get_entropy_raster is all 0 for standard object", {
   exp_raster <- new_from_template(stack_1[[1]], c(rep(0,100)))
   names(exp_raster) <- "ANN"
   q_raster <- obj$get_entropy_raster("ANN")
-  expect_equal(terra::values(exp_raster), terra::values(q_raster))
+  compare_raster_data(exp_raster, q_raster)
 
   exp_raster <- new_from_template(stack_1[[2]], c(rep(0,100)))
   names(exp_raster) <- "GLM"
   q_raster <- obj$get_entropy_raster("GLM")
-  expect_equal(terra::values(exp_raster), terra::values(q_raster))
+  compare_raster_data(exp_raster, q_raster)
 })
 
-test_that("self$get_entropy_raster varies as expected for custom object", {
+test_that("self$get_entropy_raster varies as expected for custom rasters", {
 
   vec <- c(stats::runif(30, min = 0.00, max = 0.09),
            stats::runif(30, min = 0.10, max = 0.19),
-           rep( 10, NA ),
+           rep(NA, 10),
            stats::runif(30, min = 0.20, max = 0.29))
 
   raster <- create_raster(vec)
-  stack_1 <- create_stack(nlyr = 3, raster = raster)
+  stack_1 <- create_stack(n_layers = 3, raster = raster)
   
   vec <- c(stats::runif(30, min = 0.90, max = 1.00),
            stats::runif(30, min = 0.80, max = 0.89),
-           rep( 10, NA ),
+           rep(NA, 10),
            stats::runif(30, min = 0.20, max = 0.29))
 
   raster <- create_raster(vec)
-  stack_2 <- create_stack(nlyr = 3, raster = raster)
-
-  terra::add( stack_1 ) <- stack_2
-
+  terra::add(stack_1) <- create_stack(n_layers = 3, raster = raster)
     
   # Initialize Rasta object with default intervals (10L)
   obj <- Rasta$new(
     class = "test_class",
-    replicates = 5,
-    intervals = 5,
+    replicates = 6,
     stacks = list(stack_1),
     methods = c("ANN"),
     threads = 1L,
     .skip_checks = FALSE
   )
 
-  exp_vec <- c(rep(30, 1),
-               rep(0.5*0.5*
-               rep(10, NA),
-               rep(30, 0) )
-  
-  exp_raster <- new_from_template(stack_1[[1]], c(rep(0,100)))
-  names(exp_raster) <- "ANN"
-  q_raster <- obj$get_entropy_raster("ANN")
-  expect_equal(terra::values(exp_raster), terra::values(q_raster))
+  p_count_obs <- obj$test_private("get_count_stack",
+                                  tag = "function",
+                                  args = list("ANN"))
 
+  #1
+  p_count_exp <- create_raster(c(rep(3, 30),
+                                 rep(0, 30),
+                                 rep(NA, 10),
+                                 rep(0, 30)))
+
+  #2
+  terra::add(p_count_exp) <- create_raster(c(rep(0, 30),
+                                             rep(3, 30),
+                                             rep(NA, 10),
+                                             rep(0, 30)))
+
+  #3
+  terra::add(p_count_exp) <- create_raster(c(rep(0, 30),
+                                             rep(0, 30),
+                                             rep(NA, 10),
+                                             rep(6, 30)))
+
+  for( i in 4:8 )
+  {
+      terra::add(p_count_exp) <- create_raster(c(rep(0, 60),
+                                                 rep(NA, 10),
+                                                 rep(0, 30)))
+  }
+  
+  #9   
+  terra::add(p_count_exp) <- create_raster(c(rep(0, 30),
+                                             rep(3, 30),
+                                             rep(NA, 10),
+                                             rep(0, 30)))
+  #10
+  terra::add(p_count_exp) <- create_raster(c(rep(3, 30),
+                                             rep(0, 30),
+                                             rep(NA, 10),
+                                             rep(0, 30)))
+
+  expect_equal(terra::values(p_count_obs),
+               terra::values(p_count_exp))
+
+  max_q <- obj$test_private("max_q")
+  
+  exp_Q <- c(rep(1, 30),
+             rep(0.5*0.70/max_q, 30),
+             rep(NA, 10),
+             rep(0, 30))
+  
+  exp_raster <- create_raster(exp_Q)
+  q_raster <- obj$get_entropy_raster("ANN")
+  names(exp_raster) <- "ANN"
+  compare_raster_data(exp_raster, q_raster)
+  expect_equal(obj$get_mean_entropy("ANN"), mean(stats::na.omit(exp_Q)))
+  
+  # Initialize Rasta object with 5L intervals
+  obj <- Rasta$new(
+    class = "test_class",
+    replicates = 6,
+    intervals = 5L,
+    stacks = list(stack_1),
+    methods = c("ANN"),
+    threads = 1L,
+    .skip_checks = FALSE
+  )
+
+  max_q <- obj$test_private("max_q")
+  
+  exp_Q <- c(rep(1, 60),
+             rep(NA, 10),
+             rep(0, 30))
+  
+  exp_raster <- create_raster(exp_Q)
+  q_raster <- obj$get_entropy_raster("ANN")
+  names(exp_raster) <- "ANN"
+  compare_raster_data(exp_raster, q_raster)
+  expect_equal(obj$get_mean_entropy("ANN"), mean(stats::na.omit(exp_Q)))
+})
+
+
+test_that("Weight related attribute work", {
+
+    #ANN - 30/0 - 30/0.25 -10/NA - 30/0.25
+    vec <- c(stats::runif(30, min = 0.00, max = 0.09),
+             stats::runif(30, min = 0.10, max = 0.19),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    stack_1 <- create_stack(n_layers = 3,
+                            raster = raster)
+    
+    vec <- c(stats::runif(30, min = 0.90, max = 1.00),
+             stats::runif(30, min = 0.80, max = 0.89),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    terra::add(stack_1) <- create_stack(n_layers = 3,
+                                        raster = raster)
+    
+    #GLM - 30/0 - 30/0.25 -10/NA - 30/0.25
+    vec <- c(stats::runif(30, min = 0.00, max = 0.09),
+             stats::runif(30, min = 0.10, max = 0.19),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    stack_2 <- create_stack(n_layers = 3,
+                            raster = raster)
+    
+    vec <- c(stats::runif(30, min = 0.90, max = 1.00),
+             stats::runif(30, min = 0.80, max = 0.89),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    terra::add(stack_2) <- create_stack(n_layers = 3,
+                                        raster = raster)
+
+    #GOWER - 30/0.5 - 30/0.25 -10/NA - 30/0.25
+    vec <- c(stats::runif(30, min = 0.00, max = 0.09),
+             stats::runif(30, min = 0.10, max = 0.19),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    stack_3 <- create_stack(n_layers = 3,
+                            raster = raster)
+    
+    vec <- c(stats::runif(30, min = 0.00, max = 0.09),
+             stats::runif(30, min = 0.80, max = 0.89),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    terra::add(stack_3) <- create_stack(n_layers = 3,
+                                        raster = raster)
+
+    #SVM - 30/0.5 - 30/0.25 -10/NA - 30/1/0.25
+    vec <- c(stats::runif(30, min = 0.00, max = 0.09),
+             stats::runif(30, min = 0.10, max = 0.19),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    stack_4 <- create_stack(n_layers = 3, raster = raster)
+    
+    vec <- c(stats::runif(30, min = 0.00, max = 0.09),
+             stats::runif(30, min = 0.80, max = 0.89),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    terra::add(stack_4) <- create_stack(n_layers = 3,
+                                        raster = raster)
+
+    obj <- Rasta$new(
+      class = "test_class",
+      replicates = 6,
+      stacks = list(stack_1,stack_2,stack_3,stack_4),
+      methods = c("ANN","GLM","GOWER","SVM"),
+      threads = 1L,
+      .skip_checks = FALSE
+    )
+
+    # Entropy
+    expect_is(obj, "Rasta")
+    max_q <- obj$test_private("max_q")
+
+    exp_Q <- c(rep(1, 30),
+               rep(0.5*0.70/max_q, 30),
+               rep(NA, 10),
+               rep(0, 30))
+    
+    exp_raster <- create_raster(exp_Q)
+    names(exp_raster) <- "ANN"
+    q_raster <- obj$get_entropy_raster("ANN")
+    
+    exp_raster <- create_raster(exp_Q)
+    names(exp_raster) <- "GLM"
+    q_raster <- obj$get_entropy_raster("GLM")
+    compare_raster_data(exp_raster, q_raster)
+
+    exp_Q <- c(rep(0, 30),
+               rep(0.5*0.70/max_q, 30),
+               rep(NA, 10),
+               rep(0, 30))
+    
+    exp_raster <- create_raster(exp_Q)
+    names(exp_raster) <- "GOWER"
+    q_raster <- obj$get_entropy_raster("GOWER")
+    compare_raster_data(exp_raster, q_raster)
+
+    exp_raster <- create_raster(exp_Q)
+    names(exp_raster) <- "SVM"
+    q_raster <- obj$get_entropy_raster("SVM")
+    compare_raster_data(exp_raster, q_raster)
+
+    obj <- Rasta$new(
+      class = "test_class",
+      replicates = 6,
+      stacks = list(stack_1,stack_2,stack_3,stack_4),
+      methods = c("ANN","GLM","GOWER","SVM"),
+      threads = 1L,
+      .skip_checks = FALSE
+    )
+    
+    # Denominator
+    exp_D <- c(rep(2, 30),
+               rep(0.5*0.70/max_q*4, 30),
+               rep(NA, 10),
+               rep(0, 30))
+
+    exp_raster <- create_raster(4-exp_D)
+    expect_equal(c("ANN", "GLM", "GOWER", "SVM"), obj$methods)
+    d_raster <- obj$test_private(name = "get_weight_denominator",
+                                 tag = "function")
+    compare_raster_data(exp_raster, d_raster)
+
+    obj <- Rasta$new(
+      class = "test_class",
+      replicates = 6,
+      stacks = list(stack_1,stack_2,stack_3,stack_4),
+      methods = c("ANN","GLM","GOWER","SVM"),
+      threads = 1L,
+      .skip_checks = FALSE
+    )
+    
+    # Weights
+    exp_W <- c(rep(0.00, 30),
+               rep(0.25, 30),
+               rep(NA, 10),
+               rep(0.25, 30))
+    
+    exp_raster <- create_raster(exp_W)
+
+    w_raster <- obj$get_weight_raster("ANN")
+    compare_raster_data(exp_raster, w_raster)
+
+    exp_W <- c(rep(0.00, 30),
+               rep(0.25, 30),
+               rep(NA, 10),
+               rep(0.25, 30))
+
+    exp_raster <- create_raster(exp_W)
+    w_raster <- obj$get_weight_raster("GLM")
+    compare_raster_data(exp_raster, w_raster)
+
+    exp_W <- c(rep(0.50, 30),
+               rep(0.25, 30),
+               rep(NA, 10),
+               rep(0.25, 30))
+
+    exp_raster <- create_raster(exp_W)
+    w_raster <- obj$get_weight_raster("GOWER")
+    compare_raster_data(exp_raster, w_raster)
+
+    exp_W <- c(rep(0.50, 30),
+               rep(0.25, 30),
+               rep(NA, 10),
+               rep(0.25, 30))
+
+    exp_raster <- create_raster(exp_W)
+    w_raster <- obj$get_weight_raster("SVM")
+    compare_raster_data(exp_raster, w_raster)
+
+    # Efficiency
+    obj <- Rasta$new(
+      class = "test_class",
+      replicates = 6,
+      stacks = list(stack_1,stack_2,stack_3,stack_4),
+      methods = c("ANN","GLM","GOWER","SVM"),
+      threads = 1L,
+      .skip_checks = FALSE
+    )
+
+    exp_H <- c(rep(0.50, 30),
+               rep(1, 30),
+               rep(NA, 10),
+               rep(1, 30))
+    
+    exp_raster <- create_raster(exp_H)
+    h_raster <- obj$get_efficiency_raster()
+    compare_raster_data(exp_raster, h_raster)
 })
