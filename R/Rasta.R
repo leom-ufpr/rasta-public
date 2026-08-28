@@ -211,34 +211,52 @@ Rasta <- R6::R6Class(
     },
     
     #' @description
-    #' Get the mean suitability raster, i.e., the raster with the mean suitability
-    #' values computed across the multilayer suitability `SpatRasters` for the
-    #' method passed as argument to the function
+    #' Get the mean suitability raster computed across the multilayer suitability
+    # `SpatRasters` for the  method passed as argument to the function
     #'
     #' @param method Character string. Name of the ENM method.
     #'  
     #' @return A `SpatRaster` with mean suitability values.
-    get_mean_suit_raster = function( method )
+    get_mean_suitability_raster = function( method )
     {
         private$check_method( method )
 
-        add_mean_suit_raster <- length( private$mean_suit_stack ) == 0 |
-            ! private$has_raster( "mean_suit_stack", method )
+        add_mean_suitability_raster <- length( private$mean_suitability_stack ) == 0 |
+            ! private$has_raster( "mean_suitability_stack", method )
 
-        if ( add_mean_suit_raster )
+        if ( add_mean_suitability_raster )
         {
-            suit_stack <- private$suit_stack_list[[ method ]]
+            Ss <- private$suit_stack_list[[ method ]]
 
-            mean_suit_raster <- terra::app( suit_stack,
-                                            fun = "mean",
-                                            na.rm = TRUE )
-            
-            private$mean_suit_stack[[ method ]] <- mean_suit_raster
+            private$mean_suitability_stack[[ method ]] <- terra::app( Ss,
+                                                                      fun = "mean",
+                                                                      na.rm = TRUE )
         }
 
-        return( private$mean_suit_stack[[ method ]] )
+        return( private$mean_suitability_stack[[ method ]] )
     },
-    
+
+    #' @description
+    #' Get the mean suitability raster computed across ALL methods multilayer
+    #' suitability `SpatRasters`
+    #'  
+    #' @return A `SpatRaster` with mean suitability values.
+    get_mean_ensemble_raster = function()
+    {
+        MSr <- 0
+
+        if( is.null( private$mean_ensemble_raster ) )
+        {
+            for ( method in self$methods )
+            {
+                MSr <- ( MSr + self$get_mean_suitability_raster( method ) )
+            }
+
+            private$mean_ensemble_raster <- MSr / length( self$methods )
+        }
+        
+        return( private$mean_ensemble_raster )
+    },
 
     #' @description
     #' Get the weight raster for a given method
@@ -252,12 +270,10 @@ Rasta <- R6::R6Class(
         
         if ( ! private$has_raster( "weight_stack", method ) )
         {
-            weight_numerator <- 1 - self$get_entropy_raster( method )
-            weight_denominator <- private$get_weight_denominator()
+            Wd <- private$get_weight_denominator()
+            Wr <- ( 1 - self$get_entropy_raster( method ) ) / Wd
             
-            weigth_raster <- weight_numerator/weight_denominator
-            
-            private$add_to_stack( "weight_stack", weigth_raster, method )
+            private$add_to_stack( "weight_stack", Wr, method )
         }
 
         return( private$weight_stack[[ method ]] )
@@ -271,17 +287,16 @@ Rasta <- R6::R6Class(
     {
         if ( is.null( private$wgt_ensemble_raster ) )
         {
-            wgt_ensemble_raster <- 0
+            WEr <- 0
             
             for( method in self$methods )
             {
-                mean_suit_raster <- self$get_mean_suit_raster( method )
-                weight_raster <- self$get_weight_raster( method )
-                wgt_method_raster <- mean_suit_raster * weight_raster
-                wgt_ensemble_raster <- wgt_ensemble_raster + wgt_method_raster
+                MSr <- self$get_mean_suitability_raster( method )
+                Wr <- self$get_weight_raster( method )
+                WEr <- WEr + MSr * Wr
             }
 
-            private$wgt_ensemble_raster <- wgt_ensemble_raster
+            private$wgt_ensemble_raster <- WEr
         }
 
         return( private$wgt_ensemble_raster )
@@ -294,27 +309,18 @@ Rasta <- R6::R6Class(
     #' @return A `SpatRaster` with efficiency values.
     get_efficiency_raster = function()
     {
-        max_h <- log( length( self$methods ) )
+        Hr <- 0
 
         if( is.null( private$weight_stack ) )
         {
             for( method in self$methods )
             {
-                self$get_weight_raster( method )
+                Wr <- self$get_weight_raster( method )
+                Hr <- Hr + ( Wr * log( Wr + .Machine$double.eps ) )
             }
         }
 
-        w <- private$weight_stack
-
-        Hr <- terra::app(
-            w,
-            fun = function( x )
-            {
-                y <- x[ x > 0 ]
-                sum( y * log( y ) )
-            }
-        )
-
+        max_h <- log( length( self$methods ) )        
         private$efficiency_raster <- Hr / max_h * (-1)
         
         return( private$efficiency_raster )
@@ -330,8 +336,8 @@ Rasta <- R6::R6Class(
     {
         private$check_method( method )
 
-        entropy_raster <- self$get_entropy_raster( method )
-        mean_entropy <- terra::global( entropy_raster,
+        Hr <- self$get_entropy_raster( method )
+        mean_entropy <- terra::global( Hr,
                                        fun = "mean",
                                        na.rm = TRUE )
 
@@ -449,10 +455,14 @@ Rasta <- R6::R6Class(
       # values for each method
       entropy_stack = NULL,
       
-      # mean_suit_stack Stack that stores lazily built rasters with mean
+      # mean_suitability_stack Stack that stores lazily built rasters with mean
       # suitability values for each method
-      mean_suit_stack = NULL,
+      mean_suitability_stack = NULL,
 
+      # mean_ensemble_raster Lazily built rasters with mean suitability values
+      # for the whole ensemble
+      mean_ensemble_raster = NULL,
+      
       # weight_stack Stack that stores weight rasters used in
       # weighted mean suitability computation
       weight_stack = NULL,

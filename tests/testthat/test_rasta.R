@@ -45,6 +45,19 @@ compare_raster_data <- function(raster_1, raster_2)
                  terra::values(raster_2) %>% as.numeric())
 }
 
+get_exp_mean_raster <- function(stack, method)
+{
+    terra::round(stack, digits = 3) %>%
+        terra::app(., fun = "mean", na.rm = TRUE) %>%
+        return(.)
+}
+
+test_stack_mean <- function(obj, method, exp_mean_raster)
+{
+    obs_mean_raster <- obj$get_mean_suitability_raster(method)
+    compare_raster_data(obs_mean_raster, exp_mean_raster)
+}
+
 test_that("Rasta constructor initializes correctly with valid arguments", {
   # Create toy SpatRasters
   stack_1 <- create_toy_spatraster(5)
@@ -384,9 +397,9 @@ test_that("Rasta constructor rounds cell values to 3 decimal places", {
   expect_true(base::all(round(values, 3) == values,na.rm = TRUE))
 })
 
-# New test for get_mean_suit_raster
+# New test for get_mean_suitability_raster
 
-test_that("get_mean_suit_raster returns a SpatRaster with mean suitability values", {
+test_that("get_mean_suitability_raster returns a SpatRaster with mean suitability values", {
   # Create toy SpatRasters
   stack_1 <- create_toy_spatraster(5)
   stack_2 <- create_toy_spatraster(5)
@@ -402,19 +415,19 @@ test_that("get_mean_suit_raster returns a SpatRaster with mean suitability value
   )
   
   # Get mean suitability raster for method "ANN"
-  mean_suit_raster <- obj$get_mean_suit_raster("ANN")
+  mean_suitability_raster <- obj$get_mean_suitability_raster("ANN")
   
   # Check if the returned object is a SpatRaster
-  expect_is(mean_suit_raster, "SpatRaster")
+  expect_is(mean_suitability_raster, "SpatRaster")
   
   # Check if the number of layers in the mean suitability raster is 1
-  expect_equal(terra::nlyr(mean_suit_raster), 1)
+  expect_equal(terra::nlyr(mean_suitability_raster), 1)
   
   # Check if the extent and resolution of the mean suitability raster match
   # those of the input stacks
   round_stack <- terra::round(stack_1, digits = 3)
   expect_equal(terra::values(terra::app(round_stack, fun = mean, na.rm=TRUE)),
-               terra::values(mean_suit_raster),
+               terra::values(mean_suitability_raster),
                stopOnError = FALSE)
 })
 
@@ -480,8 +493,6 @@ test_that("private$bins is correctly instantiated with custom intervals", {
   # Check the values in the last row
   expect_equal(bins[nrow(bins), ], c(0.8, 1 + .Machine$double.eps))
 })
-
-# New test to verify if private$dist_matrix is correctly instantiated
 
 test_that("private$dist_matrix is correctly instantiated with default intervals", {
   # Create toy SpatRasters
@@ -579,7 +590,7 @@ test_that("private$dist_matrix is correctly instantiated with custom intervals",
 
 # New test to verify if private$get_count_stack is correctly instantiated
 
-test_that("private$get_count_stack and private$get_p_stack returns correct count stack with default intervals", {
+test_that("private$get_count_stack and private$get_p_stack work", {
   # Create a SpatRaster with these specific values
   stack_1 <- create_toy_spatraster(5)
   
@@ -633,11 +644,6 @@ test_that("private$get_count_stack and private$get_p_stack returns correct count
                                args = list("ANN"))
 
   expect_equal(exp_stack/obj$replicates, p_stack)
-})
-
-test_that("private$get_count_stack and private$get_p_stack return correct count stack with intervals=5L", {
-  # Create a SpatRaster with these specific values
-  stack_1 <- create_toy_spatraster(5)
   
   # Initialize Rasta object with default intervals (10L)
   obj <- Rasta$new(
@@ -906,8 +912,8 @@ test_that("Weight related attribute work", {
     obj <- Rasta$new(
       class = "test_class",
       replicates = 6,
-      stacks = list(stack_1,stack_2,stack_3,stack_4),
-      methods = c("ANN","GLM","GOWER","SVM"),
+      stacks = list(stack_1, stack_2, stack_3, stack_4),
+      methods = c("ANN", "GLM", "GOWER", "SVM"),
       threads = 1L,
       .skip_checks = FALSE
     )
@@ -948,8 +954,8 @@ test_that("Weight related attribute work", {
     obj <- Rasta$new(
       class = "test_class",
       replicates = 6,
-      stacks = list(stack_1,stack_2,stack_3,stack_4),
-      methods = c("ANN","GLM","GOWER","SVM"),
+      stacks = list(stack_1, stack_2, stack_3, stack_4),
+      methods = c("ANN", "GLM", "GOWER", "SVM"),
       threads = 1L,
       .skip_checks = FALSE
     )
@@ -969,8 +975,8 @@ test_that("Weight related attribute work", {
     obj <- Rasta$new(
       class = "test_class",
       replicates = 6,
-      stacks = list(stack_1,stack_2,stack_3,stack_4),
-      methods = c("ANN","GLM","GOWER","SVM"),
+      stacks = list(stack_1, stack_2, stack_3, stack_4),
+      methods = c("ANN", "GLM", "GOWER", "SVM"),
       threads = 1L,
       .skip_checks = FALSE
     )
@@ -983,8 +989,8 @@ test_that("Weight related attribute work", {
     
     exp_raster <- create_raster(exp_W)
 
-    w_raster <- obj$get_weight_raster("ANN")
-    compare_raster_data(exp_raster, w_raster)
+    Wr_1 <- obj$get_weight_raster("ANN")
+    compare_raster_data(exp_raster, Wr_1)
 
     exp_W <- c(rep(0.00, 30),
                rep(0.25, 30),
@@ -992,8 +998,8 @@ test_that("Weight related attribute work", {
                rep(0.25, 30))
 
     exp_raster <- create_raster(exp_W)
-    w_raster <- obj$get_weight_raster("GLM")
-    compare_raster_data(exp_raster, w_raster)
+    Wr_2 <- obj$get_weight_raster("GLM")
+    compare_raster_data(exp_raster, Wr_2)
 
     exp_W <- c(rep(0.50, 30),
                rep(0.25, 30),
@@ -1001,8 +1007,8 @@ test_that("Weight related attribute work", {
                rep(0.25, 30))
 
     exp_raster <- create_raster(exp_W)
-    w_raster <- obj$get_weight_raster("GOWER")
-    compare_raster_data(exp_raster, w_raster)
+    Wr_3 <- obj$get_weight_raster("GOWER")
+    compare_raster_data(exp_raster, Wr_3)
 
     exp_W <- c(rep(0.50, 30),
                rep(0.25, 30),
@@ -1010,15 +1016,15 @@ test_that("Weight related attribute work", {
                rep(0.25, 30))
 
     exp_raster <- create_raster(exp_W)
-    w_raster <- obj$get_weight_raster("SVM")
-    compare_raster_data(exp_raster, w_raster)
+    Wr_4 <- obj$get_weight_raster("SVM")
+    compare_raster_data(exp_raster, Wr_4)
 
     # Efficiency
     obj <- Rasta$new(
       class = "test_class",
       replicates = 6,
-      stacks = list(stack_1,stack_2,stack_3,stack_4),
-      methods = c("ANN","GLM","GOWER","SVM"),
+      stacks = list(stack_1, stack_2, stack_3, stack_4),
+      methods = c("ANN", "GLM", "GOWER", "SVM"),
       threads = 1L,
       .skip_checks = FALSE
     )
@@ -1031,4 +1037,27 @@ test_that("Weight related attribute work", {
     exp_raster <- create_raster(exp_H)
     h_raster <- obj$get_efficiency_raster()
     compare_raster_data(exp_raster, h_raster)
+
+    # Mean and weighted mean suitability
+    Sm_1 <- get_exp_mean_raster(stack_1)
+    test_stack_mean(obj, "ANN", Sm_1)
+
+    Sm_2 <- get_exp_mean_raster(stack_2)
+    test_stack_mean(obj, "GLM", Sm_2)
+
+    Sm_3 <- get_exp_mean_raster(stack_3)
+    test_stack_mean(obj, "GOWER", Sm_3)
+
+    Sm_4 <- get_exp_mean_raster(stack_4)
+    test_stack_mean(obj, "SVM", Sm_4)
+    
+    suitability_stack <- c(Sm_1, Sm_2, Sm_3, Sm_4) %>%
+        terra::round(., digits = 3)
+    exp_mean_raster <- terra::app(suitability_stack, fun = mean, na.rm = TRUE)
+    mean_suit_raster <- obj$get_mean_ensemble_raster()
+    compare_raster_data(exp_mean_raster, mean_suit_raster)
+
+    Exp_WEr <- Sm_1 * Wr_1 + Sm_2 * Wr_2 + Sm_3 * Wr_3 + Sm_4 * Wr_4
+    Obs_WEr <- obj$get_wgt_ensemble_raster()
+    compare_raster_data(Exp_WEr, Obs_WEr)
 })
