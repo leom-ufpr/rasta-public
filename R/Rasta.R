@@ -32,7 +32,7 @@ Rasta <- R6::R6Class(
     threads = NULL,
     
     #' @field .skip_checks Used for internal object instatiation.
-    .skip_checks = FALSE,
+    .skip_checks = NULL,
     
     #' @description
     #' Initialize a new Rasta object
@@ -175,11 +175,15 @@ Rasta <- R6::R6Class(
     #' Get the entropy raster for a given method
     #'
     #' @param method Character string. Name of the ENM method.
+    #' @param msg Logical. Whether function execution message should be printed
+    #' or not.
     #'
     #' @return A SpatRaster object with Rao's entropy values.
-    get_entropy_raster = function( method )
+    get_entropy_raster = function( method, msg = TRUE )
     {
         private$check_method( method )
+
+        private$print_message( "get_entropy_raster", method, msg )
 
         if ( ! private$has_raster( "entropy_stack", method ) )
         {
@@ -215,11 +219,15 @@ Rasta <- R6::R6Class(
     # `SpatRasters` for the  method passed as argument to the function
     #'
     #' @param method Character string. Name of the ENM method.
+    #' @param msg Logical. Whether function execution message should be printed
+    #' or not.
     #'  
     #' @return A `SpatRaster` with mean suitability values.
-    get_mean_suitability_raster = function( method )
+    get_mean_suitability_raster = function( method, msg = TRUE )
     {
         private$check_method( method )
+
+        private$print_message( "get_mean_suitability_raster", method, msg )
 
         add_mean_suitability_raster <- length( private$mean_suitability_stack ) == 0 |
             ! private$has_raster( "mean_suitability_stack", method )
@@ -247,9 +255,12 @@ Rasta <- R6::R6Class(
 
         if( is.null( private$mean_ensemble_raster ) )
         {
-            for ( method in self$methods )
+            msg <- "Generating mean suitability raster, please wait..."
+            
+            for ( method_idx in cli::cli_progress_along( self$methods, name = msg ) )
             {
-                MSr <- ( MSr + self$get_mean_suitability_raster( method ) )
+                method <- self$methods[[ method_idx]]
+                MSr <- ( MSr + self$get_mean_suitability_raster( method, msg = FALSE ) )
             }
 
             private$mean_ensemble_raster <- MSr / length( self$methods )
@@ -262,16 +273,20 @@ Rasta <- R6::R6Class(
     #' Get the weight raster for a given method
     #'
     #' @param method Character string. Name of the ENM method.
+    #' @param msg Logical. Whether function execution message should be printed
+    #' or not.
     #'
     #' @return A SpatRaster with raster weights.
-    get_weight_raster = function( method )
+    get_weight_raster = function( method, msg = TRUE )
     {
         private$check_method( method )
+
+        private$print_message( "get_weight_raster", method, msg )
         
         if ( ! private$has_raster( "weight_stack", method ) )
         {
             Wd <- private$get_weight_denominator()
-            Wr <- ( 1 - self$get_entropy_raster( method ) ) / Wd
+            Wr <- ( 1 - self$get_entropy_raster( method, msg = FALSE ) ) / Wd
             
             private$add_to_stack( "weight_stack", Wr, method )
         }
@@ -288,11 +303,14 @@ Rasta <- R6::R6Class(
         if ( is.null( private$wgt_ensemble_raster ) )
         {
             WEr <- 0
+
+            msg <- "Generating weighted ensemble raster, please wait..."
             
-            for( method in self$methods )
+            for( method_idx in cli::cli_progress_along( self$methods, name = msg ) )
             {
-                MSr <- self$get_mean_suitability_raster( method )
-                Wr <- self$get_weight_raster( method )
+                method <- self$methods[[ method_idx ]]
+                MSr <- self$get_mean_suitability_raster( method, msg = FALSE )
+                Wr <- self$get_weight_raster( method, msg = FALSE )
                 WEr <- WEr + MSr * Wr
             }
 
@@ -313,9 +331,12 @@ Rasta <- R6::R6Class(
 
         if( is.null( private$weight_stack ) )
         {
-            for( method in self$methods )
+            msg <- "Generating efficiency raster, please wait..."
+            
+            for( method_idx in cli::cli_progress_along( self$methods, name = msg ) )
             {
-                Wr <- self$get_weight_raster( method )
+                method <- self$methods[[ method_idx ]]
+                Wr <- self$get_weight_raster( method, msg = FALSE )
                 Hr <- Hr + ( Wr * log( Wr + .Machine$double.eps ) )
             }
         }
@@ -330,14 +351,18 @@ Rasta <- R6::R6Class(
     #' Get the mean entropy for a given method
     #'
     #' @param method Character string. Name of the ENM method.
+    #' @param msg Logical. Whether function execution message should be printed
+    #' or not.
     #'
     #' @return A single value representing the mean raster entropy.
-    get_mean_entropy = function( method )
+    get_mean_entropy = function( method, msg = TRUE )
     {
         private$check_method( method )
 
-        Hr <- self$get_entropy_raster( method )
-        mean_entropy <- terra::global( Hr,
+        private$print_message( "get_mean_entropy", method, msg )
+
+        Qr <- self$get_entropy_raster( method, msg = FALSE )
+        mean_entropy <- terra::global( Qr,
                                        fun = "mean",
                                        na.rm = TRUE )
 
@@ -368,9 +393,11 @@ Rasta <- R6::R6Class(
 
         results <- tibble::tibble( method = factor(),
                                    bs_replicate = integer(),
-                                   log_mean_entropy = numeric() )
+                                   mean_entropy = numeric() )
 
-        for ( i in 1:reps )
+        msg <- "Bootstrapping entropy, please wait..."
+        
+        for ( i in cli::cli_progress_along( 1:reps, name = msg ) )
         {
             set.seed( seed + ( i - 1 ) * 10 )
 
@@ -389,17 +416,27 @@ Rasta <- R6::R6Class(
                                      threads = self$threads,
                                      .skip_checks = TRUE )
 
-            mean_entropy <- boot_rasta$get_mean_entropy(method)
+            mean_entropy <- boot_rasta$get_mean_entropy( method, msg = FALSE )
 
             results <- tibble::add_row( results,
                                         method = method,
                                         bs_replicate = i,
-                                        log_mean_entropy = log10( mean_entropy ) )
+                                        mean_entropy = mean_entropy )
         }
 
         return( results )
     },
 
+    #' @description
+    #' Function that allows access to private attributes and functions for testing.
+    #' Do not use unless you are a developer,
+    #' 
+    #' @param name Character string. Name of private attribute or function.
+    #' @param tag Character. Tag identifying if attribute or function is being
+    #' called.
+    #' @param args List. List of arguments to be passed to private function.
+    #'
+    #' @return Attribute or function result.
     test_private = function( name = NULL, tag = "attrb", args = list() )
     {
         base::stopifnot( base::is.character( name ) )
@@ -480,11 +517,15 @@ Rasta <- R6::R6Class(
       # Check if argument is a positive integer
       is_positive_integer = function( x )
       {
-          numeric <- is.numeric( x ) & is.finite( x ) & length( x ) == 1
+          numeric <- is.numeric( x ) &
+              is.finite( x ) &
+              length( x ) == 1 &
+              ! is.na( x )
 
           if( ! numeric ) return( FALSE )
 
-          pos_integer <- x > 0 & x == as.integer( x )
+          pos_integer <- x > 0 &
+              x == as.integer( x )
 
           if( ! pos_integer ) return( FALSE )
 
@@ -494,10 +535,14 @@ Rasta <- R6::R6Class(
       # Check alignment within each `SpatRaster` and consistency across all 
       check_rasters = function()
       {
-          for ( method in names( private$suit_stack_list ) )
+          methods <- names( private$suit_stack_list )
+          msg <- "Checking rasters"
+          
+          for ( method_idx in cli::cli_progress_along( methods, name = msg ) )
           {
+              method <- methods[[ method_idx ]]
               stack <- private$suit_stack_list[[ method ]]
-
+              
               # Round values to 3 decimal digits
               stack <- terra::round( stack, digits = 3 )
               
@@ -607,6 +652,27 @@ Rasta <- R6::R6Class(
           return( TRUE )
       },
 
+      # Message function
+      print_message = function( fun_name, method = NULL, msg = FALSE )
+      {
+          if( isTRUE( msg ) )
+          {
+              stopifnot( is.character( fun_name ) )
+              
+              if( ! is.null( method ) )
+                  { stopifnot( is.character( method ) ) }
+
+              msg_header <- paste0( "Executing `", fun_name, "`" )
+              
+              if( ! is.null( method ) )
+                  { paste( msg_header, "for", fun_name ) }
+
+              message( msg_header )
+          }
+
+          invisible( NULL )
+      },
+      
       # Check if stack has `SpatRaster` labeled with `name`
       has_raster = function( stack, method )
       {
@@ -701,7 +767,7 @@ Rasta <- R6::R6Class(
 
               for( method in self$methods )
               {
-                  Qs <- c( Qs, self$get_entropy_raster( method ) )
+                  Qs <- c( Qs, self$get_entropy_raster( method, msg = FALSE ) )
               }
 
               M <- length( self$methods )

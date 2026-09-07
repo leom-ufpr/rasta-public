@@ -19,17 +19,20 @@ tune_ann <- function()
     return( tuning_results )
 }
 
-tune_b_bioclim <- function()
-{
-    eval_grid <- tidyr::expand_grid( quant = BIOCLIM_QUANT )
-
-    tune_all( eval_grid, "b_bioclim" ) %>%
-        return(.)
-}
-
-tune_d_bioclim <- function()
+tune_bioclim <- function()
 {
     return( empty_tuning_results() )
+}
+
+tune_enfa <- function()
+{
+    sanitize_enfa()
+    
+    eval_grid <- tidyr::expand_grid( nf = ENFA_NF,
+                                     ridge = ENFA_RIDGE )
+
+    tune_all( eval_grid, "enfa" ) %>%
+        return(.)
 }
 
 tune_gam <- function()
@@ -45,11 +48,6 @@ tune_glm <- function()
 }
 
 tune_gower <- function()
-{
-    return( empty_tuning_results() )
-}
-
-tune_mahal <- function()
 {
     return( empty_tuning_results() )
 }
@@ -310,7 +308,7 @@ get_tuning_list <- function( tuning_results, par_sets )
     best_par_idx <- base::which.min( tuning_sel$pa.for ) %>%
         tuning_sel$par_idx[.]
 
-    # Create logical column "best_par" in original tibble flagging best parameter set
+    # Create logical column "best_par" in original tibble flagging best parameters
     # Return list with results tibble and grid element with best parameters
     best_par_vec <- c( tuning_results$par_idx == best_par_idx &
         tuning_results$pa.for == min_pa.for )
@@ -325,6 +323,53 @@ get_tuning_list <- function( tuning_results, par_sets )
                         par_sets = par_sets,
                         best_pars = par_sets[ best_par_idx, ] ) %>%
         return(.)
+}
+
+sanitize_enfa <- function()
+{
+    if( ! base::exists( "ENFA_NF" ) )
+    {
+        stop_on_error( "ENFA",
+                       "ENFA_NF",
+                       "vector to be set in configuration script" )
+    }
+
+    if( ! base::exists( "ENFA_RIDGE" ) )
+    {
+        stop_on_error( "ENFA",
+                       "ENFA_RIDGE",
+                       "vector to be set in configuration script" )
+    }
+    
+    if( ! is_positive_integer( ENFA_NF ) )
+    {
+        stop_on_error( "ENFA",
+                       "ENFA_NF",
+                       "vector with positive integers" )
+    }
+
+    if( base::min( ENFA_NF ) < 2 )
+    {
+        stop_on_error( "ENFA",
+                       "ENFA_NF",
+                       "minimum number of factors for ENFA_NF is 2" )
+    }
+
+    if( base::max( ENFA_NF ) > base::length( LAYER_CODES ) )
+    {
+        stop_on_error( "ENFA",
+                       "ENFA_NF",
+                       "maximum NF must not exceed number of environmental layers" )
+    }
+
+    if( ! is_positive_numeric( ENFA_RIDGE ) )
+    {
+        stop_on_error( "ENFA",
+                       "ENFA_RIDGE",
+                       "vector with positive real numbers" )
+    }
+
+    invisible( NULL )
 }
 
 # Return list with empty results for aquarium models
@@ -343,3 +388,12 @@ assemble_formula <- function( terms )
         base::paste0( "resp_var ~ ", . ) %>%
         return(.)
 }
+
+# Kills program with error messages if tunable parameters are misspecified
+stop_on_error <- function( model, parameter, expected )
+{
+    stop( "Wrong parameter type ", parameter,
+          "passed to ", model,
+          " - expects ", expected )
+}
+

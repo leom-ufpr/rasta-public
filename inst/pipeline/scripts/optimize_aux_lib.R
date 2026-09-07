@@ -26,8 +26,5 @@ FOR_CHOICE_TB <- tibble::tibble()
 # Replicates employed in model evaluation via TSS
 TSS_EVAL_TB <- tibble::tibble()
 
-# h2o shutdown flag
-H2O_WAS_RUN <- FALSE
-
 # Testing variable
 PEEK_VARIABLE_1 <- NULL

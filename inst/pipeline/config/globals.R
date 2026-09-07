@@ -1,0 +1,42 @@
+# ==============================================================================
+# USER INPUTS (EDIT HERE IF NEEDED)
+# ==============================================================================
+# Edit to your needs
+BASE_ENV <- base::file.path( base::getwd() )
+
+# Base path to scripts
+SCRIPT_ENV <- base::file.path( BASE_ENV, "scripts" )
+
+# Paths to data (ASCII rasters and occurrences) - edit to your folders
+DATA_ENV <- base::file.path( BASE_ENV, "raw-data" )
+
+# Folder where output files will be saved
+OUTPUT_ENV <- base::file.path( BASE_ENV, "output" )
+
+# Vector with layer acronyms that prefix *.asc files:
+# btm -> Bathymetry; Chlorophyll A -> cla; Diffuse attenuation -> dat,
+# salinity -> sal, sea surface semperature -> sst
+LAYER_CODES <- c( "btm", "cla", "dat", "sal", "sst" ) 
+
+# Vector with cutout acronyms
+# atl -> Atlantic (S. radians), brz -> Brazil (S. stellata),
+# crb -> Caribbean (S. siderea)
+CUTOUT_CODES <- c( "atl", "brz", "crb" )
+
+# Ensures that the data will be displayed with the same number of decimal places
+# in original CSV
+SIG_DIG <- 6L
+
+# Preferred projection  
+PREFERRED_CRS <- "EPSG:4326"
+
+# Port for connection when using h2o (ANN); change to other value (e.g. 54327)
+# and retry if cluster does not start
+H2O_PORT <- 54321
+
+# h2o shutdown flag
+H2O_WAS_RUN <- FALSE
+
+library( magrittr )
+
+base::options( show.error.locations = TRUE )

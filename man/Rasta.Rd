@@ -2,12 +2,14 @@
 % Please edit documentation in R/Rasta.R
 \name{Rasta}
 \alias{Rasta}
-\title{#' @description
+\title{R6 Class to instantiate \code{Rasta} objects}
+\description{
 \code{Rasta} applies information theory to ensemble learning in ENM by combining
 outcomes from several ENM models. Data are stored as multilayer \code{terra}
 \code{SpatRaster} objects that can be provided at initialization or added later
-via the \code{add()} method.}
-\description{
+via the \code{add()} method.
+}
+\details{
 The \code{Rasta} class expects:
 \itemize{
 \item All rasters must be aligned (same extent, resolution, and CRS)
@@ -29,7 +31,7 @@ across all methods}
 
     \item{\code{threads}}{Number of threads for parallelized operations}
 
-    \item{\code{entropy_stack}}{Stack with Rao's (Q) entropy rasters}
+    \item{\code{.skip_checks}}{Used for internal object instatiation.}
   }
   \if{html}{\out{</div>}}
 }
@@ -38,11 +40,14 @@ across all methods}
   \itemize{
     \item \href{#method-Rasta-initialize}{\code{Rasta$new()}}
     \item \href{#method-Rasta-get_entropy_raster}{\code{Rasta$get_entropy_raster()}}
+    \item \href{#method-Rasta-get_mean_suitability_raster}{\code{Rasta$get_mean_suitability_raster()}}
+    \item \href{#method-Rasta-get_mean_ensemble_raster}{\code{Rasta$get_mean_ensemble_raster()}}
     \item \href{#method-Rasta-get_weight_raster}{\code{Rasta$get_weight_raster()}}
     \item \href{#method-Rasta-get_wgt_ensemble_raster}{\code{Rasta$get_wgt_ensemble_raster()}}
     \item \href{#method-Rasta-get_efficiency_raster}{\code{Rasta$get_efficiency_raster()}}
     \item \href{#method-Rasta-get_mean_entropy}{\code{Rasta$get_mean_entropy()}}
     \item \href{#method-Rasta-bootstrap_entropy}{\code{Rasta$bootstrap_entropy()}}
+    \item \href{#method-Rasta-test_private}{\code{Rasta$test_private()}}
     \item \href{#method-Rasta-clone}{\code{Rasta$clone()}}
   }
 }
@@ -96,18 +101,60 @@ Default is FALSE.}
   Get the entropy raster for a given method
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Rasta$get_entropy_raster(method)}
+    \preformatted{Rasta$get_entropy_raster(method, msg = TRUE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{method}}{Character string. Name of the ENM method.}
+      \item{\code{msg}}{Logical. Whether function execution message should be printed
+or not.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
     A SpatRaster object with Rao's entropy values.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Rasta-get_mean_suitability_raster"></a>}}
+\if{latex}{\out{\hypertarget{method-Rasta-get_mean_suitability_raster}{}}}
+\subsection{\code{Rasta$get_mean_suitability_raster()}}{
+  Get the mean suitability raster computed across the multilayer suitability
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Rasta$get_mean_suitability_raster(method, msg = TRUE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{method}}{Character string. Name of the ENM method.}
+      \item{\code{msg}}{Logical. Whether function execution message should be printed
+or not.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A \code{SpatRaster} with mean suitability values.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Rasta-get_mean_ensemble_raster"></a>}}
+\if{latex}{\out{\hypertarget{method-Rasta-get_mean_ensemble_raster}{}}}
+\subsection{\code{Rasta$get_mean_ensemble_raster()}}{
+  Get the mean suitability raster computed across ALL methods multilayer
+suitability \code{SpatRasters}
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Rasta$get_mean_ensemble_raster()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A \code{SpatRaster} with mean suitability values.
   }
 }
 
@@ -118,13 +165,15 @@ Default is FALSE.}
   Get the weight raster for a given method
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Rasta$get_weight_raster(method)}
+    \preformatted{Rasta$get_weight_raster(method, msg = TRUE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{method}}{Character string. Name of the ENM method.}
+      \item{\code{msg}}{Logical. Whether function execution message should be printed
+or not.}
     }
     \if{html}{\out{</div>}}
   }
@@ -171,13 +220,15 @@ entropy computed using weights
   Get the mean entropy for a given method
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Rasta$get_mean_entropy(method)}
+    \preformatted{Rasta$get_mean_entropy(method, msg = TRUE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{method}}{Character string. Name of the ENM method.}
+      \item{\code{msg}}{Logical. Whether function execution message should be printed
+or not.}
     }
     \if{html}{\out{</div>}}
   }
@@ -207,6 +258,32 @@ entropy computed using weights
   }
   \subsection{Returns}{
     A tibble with columns: method, bs_replicate, and log_mean_entropy.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Rasta-test_private"></a>}}
+\if{latex}{\out{\hypertarget{method-Rasta-test_private}{}}}
+\subsection{\code{Rasta$test_private()}}{
+  Function that allows access to private attributes and functions for testing.
+Do not use unless you are a developer,
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Rasta$test_private(name = NULL, tag = "attrb", args = list())}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{name}}{Character string. Name of private attribute or function.}
+      \item{\code{tag}}{Character. Tag identifying if attribute or function is being
+called.}
+      \item{\code{args}}{List. List of arguments to be passed to private function.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    Attribute or function result.
   }
 }
 

@@ -1,7 +1,12 @@
-## ===============================================================================================================================
+base::rm( list = base::ls() )
+
+source( "config/globals.R" )
+
+## =============================================================================
 ## 1. USER INPUTS (EDIT HERE)
-## ===============================================================================================================================
-# Number of cores for paralelization - only applicable to some algorithms - increase for faster processing
+## =============================================================================
+# Number of cores for paralelization - only applicable to some algorithms -
+# increase for faster processing
 N_CORES <- 15L
 
 # RDS output file name for list with tunning results
@@ -11,23 +16,27 @@ TUNING_FNAME <- "tuning_results"
 TSS_EVAL_FNAME <- "evaluation_results"
 
 # Models to be tuned and/or evaluated
-EVAL_MODELS <- c( "ann", "b_bioclim", "gam", "glm", "gower", "mahal", "mars", "maxent", "svm" )
+EVAL_MODELS <- c( "ann", "bioclim", "enfa", "gam", "glm", "gower", "mars",
+                  "maxent", "svm" )
 
-# Number of pseudo-replicates to be used in the selection of linear combination parameters for engine models
+# Number of pseudo-replicates to be used in the selection of linear combination
+# parameters for engine models
 FRM_COUNT <- 10L
 
-# Number of pseudo-replicates to be used in FOR (False Omission Rate) selection of parameters/linear combinations
+# Number of pseudo-replicates to be used in FOR (False Omission Rate) selection
+# of parameters/linear combinations
 FOR_COUNT <- 10L
 
-# Number of reps to be used in TSS (True Skill Statistics) model evaluation; if negative, all non-optimization (i.e. BIC or FOR)
-# reps will be used
+# Number of reps to be used in TSS (True Skill Statistics) model evaluation; if
+# negative, all non-optimization (i.e. BIC or FOR) reps will be used
 EVAL_COUNT <- -1L
 
-# MODEL PARAMETERS
-# Base formula with linear combination of variables for MARS optimization
+# MODEL PARAMETERS ### HARD CODED ###
+# Base formula with linear combination of variables for MARS optimization 
 BASE_FORMULA <- resp_var ~ btm + cla + dat + sal + sst
 
-# Full formula with quadratic terms and up to two-way interactions for GLM backwards optimization 
+# Full formula with quadratic terms and up to two-way interactions for GLM
+# backwards optimization 
 FULL_FORMULA <- resp_var ~ ( btm + cla + dat + sal + sst ) ^ 2 +
     I( btm^2 ) + I( cla^2 ) + I( dat^2 ) + I( sal^2 ) + I( sst^2 )
 
@@ -50,11 +59,12 @@ ANN_EPOCHS <- 50L
 # ANN seed for reproducibility
 ANN_SEED <- 1234
 
-# Port for connection when using h2o (ANN); change to other value (e.g. 54327) and retry if cluster does not start
-H2O_PORT <- 54321
+# Range of ENFA's factors (PCs) to be retained in the analysis
+ENFA_NF <- c( 2:base::length( LAYER_CODES ) )
 
-# Quantiles for Bioclim tuner (quantiles of extreme values to be ignored)
-BIOCLIM_QUANT <- c( 5e-3, 10e-3, 25e-3, 50e-3 )
+# Ridge regularization og the covariance matrix used to compute the Mahalanobis
+# distances in ENFA
+ENFA_RIDGE <- c( 1e-4, 1e-3, 1e-2, 1e-1, 1 )
 
 # Range of GAM's gamma penalization parameter during background formula selection
 GAM_GAMMA <- c( 1.4, 1.6, 1.8, 2.0 )
@@ -65,7 +75,8 @@ GAM_EDF <- 0.1
 # Maxent regularization multipliers 
 MAXENT_RM <- c( 0.5, 1L, 2L, 3L, 5L )
 
-# Maxent feature classes: L = Linear, Q = Quadratic, H = Hinge, P = product, T = threshold
+# Maxent feature classes: L = Linear, Q = Quadratic, H = Hinge, P = product,
+# T = threshold
 MAXENT_FC <- c( "l", "lq", "lqh", "lqhp", "lqht", "lqhpt" )
 
 # SVM cost values
@@ -77,11 +88,9 @@ SVM_GAMMA <- c( 0.001, 0.01, 0.1, 1L, 2L, 5L )
 # Maximum Acceptable False Omission Rate during model tuning
 MA_FOR <- 0.1
 
-## ==============================================================================================================================
+## =============================================================================
 ## 2. SAVE TUNING RESULTS AND/OR MODEL EVALUATION RESULTS FOR ALL CUTOUTS
-## ==============================================================================================================================
-source( "config/globals.R" )
-
+## =============================================================================
 base::file.path( SCRIPT_ENV, "optimize_models_lib.R" ) %>%
     source(.)
 

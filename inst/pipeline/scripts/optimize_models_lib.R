@@ -3,34 +3,8 @@ main <- function()
     # Prepare parallelization
     future::plan( multisession, workers = get_num_cores( N_CORES ) )
 
-    for( code in CUTOUT_CODES )
-    {
-        # Open log file to which warnings will be silently directed
-        log_con <- base::paste0( "optimization_warnings_", code, ".log" ) %>% 
-            get_log_con(.)
+    process_codes( "log/optim_warnings_" )
 
-        # Store closure that handles warnings
-        handle_warnings <- get_warning_handler( log_con, code )
-        
-        message( "Processing '", code, "' data" )
-
-        withCallingHandlers(
-        {
-            process_cutout( code )
-        },
-        warning = handle_warnings )
-
-        message( "DONE!" )
-        message()
-        
-        base::close( log_con )
-    }
-
-    # Shutdpwn
-    message( "Cleaning up" )
-    
-    if( H2O_WAS_RUN ) h2o::h2o.shutdown( prompt = FALSE )
-    
     future::plan( sequential )
     base::gc()
 }
@@ -44,13 +18,13 @@ process_cutout <- function( code )
     tuning_results <- base::lapply( EVAL_MODELS, tune_models )
     base::names( tuning_results ) <- EVAL_MODELS
     
-     Save tuning results if any of the models was tuned
+    # Save tuning results if any of the models was tuned
     if( SAVE_TUNING_RESULTS )
     {
         save_rds( tuning_results,
-                 TUNING_FNAME,
-                 code,
-                 OUTPUT_ENV )
+                  TUNING_FNAME,
+                  code,
+                  OUTPUT_ENV )
     }
 
     # Get evaluation tibble, capturing warnings

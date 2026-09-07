@@ -3,6 +3,9 @@ get_ann_trainer <- function()
 {
     return( function( rep_tb, train_idx, my_pars )
     {
+        sanitize_trainer_pars( rep_tb, train_idx, "ann" )
+        sanitize_tb( my_pars, "my_pars", "ann", "trainer" )
+   
         training_h2o <- rep_tb[ train_idx, ] %>%
             dplyr::mutate_at( "resp_var", as.factor ) %>%
             h2o::as.h2o(.)
@@ -20,33 +23,93 @@ get_ann_trainer <- function()
     } )
 }
 
-get_b_bioclim_trainer <- function()
+get_bioclim_trainer <- function()
 {
-    # biomod2::SRE does not return a trained object, just the predictions
-    return( function( rep_tb, train_idx, my_pars )
+    return( function( rep_tb, train_idx, ... )
     {
-        # Reverse to testing set
-        test_idx <- ! train_idx
-        
-        biomod2::bm_SRE( resp.var = rep_tb$resp_var[ test_idx ],
-                         expl.var = get_var_mx( rep_tb, test_idx ),
-                         new.env = NULL,
-                         quant = my_pars$quant[1],
-                         do.extrem = FALSE ) %>%
+        sanitize_trainer_pars( rep_tb, train_idx, "bioclim" )
+
+        po_rep_tb <- get_pres_only_data( rep_tb, train_idx )
+
+        predicts::envelope( po_rep_tb ) %>% 
             return(.)
     } )
 }
 
-get_d_bioclim_trainer <- function()
+get_enfa_trainer <- function()
 {
-    get_aquarium_trainer( "bioclim" ) %>%
-        return(.)
+    return( function( rep_tb, train_idx, my_pars )
+    {
+        sanitize_trainer_pars( rep_tb, train_idx, "enfa" )
+        sanitize_tb( my_pars, "my_pars", "enfa", "trainer" )
+
+        nf <- my_pars$nf[1]
+        ridge <- my_pars$ridge[1]
+
+        # Fit PCA
+        pca_fit <- ade4::dudi.pca( df = rep_tb[ train_idx, LAYER_CODES ],
+                                   center = TRUE,
+                                   scale = TRUE,
+                                   scannf = FALSE,
+                                   nf = nf )
+        
+        train_y <- rep_tb[ train_idx, "resp_var", drop = TRUE ]
+
+        # Fit ENFA on the training PCA object and its 0/1 presence vector
+        enfa_fit <- adehabitatHS::enfa( dudi = pca_fit,
+                                        pr = train_y,
+                                        scannf = FALSE,
+                                        nf = nf - 1 )
+
+        train_enfa_scores <- enfa_fit$li %>% base::as.matrix(.)
+
+        # Define the occupied niche using training presences only
+        occ_enfa_scores <- train_enfa_scores[ train_y == 1, , drop = FALSE ]
+        niche_center <- base::colMeans( occ_enfa_scores )
+
+        # Estimate covariance of presences in retained ENFA space; regularize
+        # covariance
+        niche_cov <- stats::cov( occ_enfa_scores )
+        niche_cov_reg <- niche_cov + base::diag( ridge, nrow = nf, ncol = nf )
+
+        # Protect against singular / non-finite covariance matrices.
+        infinity_in_matrix <- ! base::is.finite( niche_cov_reg ) %>%
+            base::any(.)
+        
+        if ( infinity_in_matrix )
+        {
+            stop( "Regularized ENFA covariance matrix contains non-finite values." )
+        }
+
+        # Invert the matrix
+        sigma_inv <- tryCatch( base::solve( niche_cov_reg ),
+                               error = function( e )
+                               {
+                                  stop( "Unable to invert the regularized ENFA",
+                                        "covariance matrix. Try a larger `ridge`",
+                                        "value than", ridge, "or a smaller `nf`",
+                                        "value than", nf, ". Original error: ",
+                                        base::conditionMessage(e) )
+                               } )
+
+        # Stores everything in a structure that reperesents the fitted model
+        base::list( nf = nf,
+                    pca_fit = pca_fit,
+                    enfa_fit = enfa_fit,
+                    niche_center = niche_center,
+                    sigma_inv = sigma_inv ) %>%
+            base::structure( ., class = "enfa_trainer" ) %>%
+            return(.)
+    })
 }
 
 get_gam_trainer <- function()
 {
     return( function( rep_tb, train_idx, my_pars )
     {
+        sanitize_trainer_pars( rep_tb, train_idx, "gam" )
+        sanitize_tb( my_pars, "my_pars", "gam", "trainer" )
+
         mgcv::gam( formula = get_training_formula( my_pars$formula[1] ),
                    data = rep_tb[ train_idx, ],
                    family = stats::binomial( link = "logit" ),
@@ -60,6 +123,9 @@ get_glm_trainer <- function()
 {
     return( function( rep_tb, train_idx, my_pars )
     {
+        sanitize_trainer_pars( rep_tb, train_idx, "glm" )
+        sanitize_tb( my_pars, "my_pars", "glm", "trainer" )
+
         stats::glm( formula = get_training_formula( my_pars$formula[1] ),
                     data = rep_tb[ train_idx, ],
                     family = stats::binomial( link = "logit" ),
@@ -70,20 +136,24 @@ get_glm_trainer <- function()
 
 get_gower_trainer <- function()
 {
-    get_aquarium_trainer( "domain" ) %>%
-        return(.)
-}
+    return( function( rep_tb, train_idx, ... )
+    {
+        sanitize_trainer_pars( rep_tb, train_idx, "gower" )
 
-get_mahal_trainer <- function()
-{
-    get_aquarium_trainer( "mahal" ) %>%
-        return(.)
+        po_rep_mx <- get_pres_only_data( rep_tb, train_idx )
+ 
+        dismo::domain( po_rep_mx ) %>% 
+            return(.)
+    } )
 }
 
 get_mars_trainer <- function()
 {
     return( function( rep_tb, train_idx, my_pars )
     {
+        sanitize_trainer_pars( rep_tb, train_idx, "mars" )
+        sanitize_tb( my_pars, "my_pars", "mars", "trainer" )
+
         earth::earth( formula = get_training_formula( my_pars$formula[1] ),
                       data = rep_tb[ train_idx, ],
                       glm = base::list( family = binomial ) ) %>%
@@ -95,6 +165,9 @@ get_maxent_trainer <- function()
 {
     return( function( rep_tb, train_idx, my_pars )
     {
+        sanitize_trainer_pars( rep_tb, train_idx, "maxent" )
+        sanitize_tb( my_pars, "my_pars", "maxent", "trainer" )
+
         pa_vector <- rep_tb$resp_var[ train_idx ] %>%
             base::as.numeric(.)
 
@@ -110,6 +183,9 @@ get_svm_trainer <- function()
 {
     return( function( rep_tb, train_idx, my_pars )
     {
+        sanitize_trainer_pars( rep_tb, train_idx, "svm" )
+        sanitize_tb( my_pars, "my_pars", "svm", "trainer" )
+
         # Factorize response variable
         resp_var <- rep_tb$resp_var[ train_idx ] %>%
             base::factor(., levels = c( 0, 1 ) )
@@ -128,20 +204,6 @@ get_svm_trainer <- function()
     } )
 }
 
-get_aquarium_trainer <- function( fun_name )
-{
-    training_fun <- base::asNamespace( "dismo" ) %>%
-        base::get( fun_name, envir = . )
-
-   return( function( rep_tb, train_idx, ... )
-   {
-       expl_var <- get_pres_only_data( rep_tb, train_idx )
-
-       training_fun( expl_var ) %>% 
-           return(.)
-   } )
-}
-
 # Tester closures (model selection and evaluation)
 get_ann_tester <- function()
 {
@@ -149,18 +211,15 @@ get_ann_tester <- function()
         return(.)
 }
 
-get_b_bioclim_tester <- function()
+get_bioclim_tester <- function()
 {
-    # Simply return predictions for test set
-    return( function( rep_tb, test_idx, fit )
-    {
-        return( fit )
-    } )
+    get_tester_for( "bioclim" ) %>%
+        return(.)
 }
 
-get_d_bioclim_tester <- function()
+get_enfa_tester <- function()
 {
-    get_aquarium_tester() %>%
+    get_tester_for( "enfa" ) %>%
         return(.)
 }
 
@@ -178,13 +237,7 @@ get_glm_tester <- function()
 
 get_gower_tester <- function()
 {
-    get_aquarium_tester() %>%
-        return(.)
-}
-
-get_mahal_tester <- function()
-{
-    get_tester_for( "mahal" ) %>%
+    get_tester_for( "gower" ) %>%
         return(.)
 }
 
@@ -206,13 +259,7 @@ get_svm_tester <- function()
         return(.)
 }
 
-# Generic testers
-get_aquarium_tester <- function()
-{
-    get_tester_for( "aquarium" ) %>%
-        return(.)
-}
-
+# Generic tester
 get_stats_tester <- function()
 {
     get_tester_for( "stats" ) %>%
@@ -254,6 +301,49 @@ get_ann_predictor <- function()
     })
 }
 
+get_bioclim_predictor <- function()
+{
+    function( model, data, ...)
+    {
+        predicts::predict( object = model, x = data ) %>%
+            base::as.numeric(.) %>%
+            return(.)
+    }
+}
+
+get_enfa_predictor <- function()
+{
+    return( function( model, data, ...)
+    {
+        # Standardize test data using parameters from the training set
+        pca_fit <- model$pca_fit
+
+        test_scaled <- base::as.matrix( data ) %>%
+            base::sweep( . , 2, pca_fit$cent, FUN = "-" ) %>%
+            base::sweep( . , 2, pca_fit$norm, FUN = "/" )
+
+        # Extract ENFA axis coefficients
+        enfa_fit <- model$enfa_fit
+        nf_idx <- base::seq_len( model$nf )
+        axis_coeff <- enfa_fit$co[ , nf_idx, drop = FALSE ] %>%
+            base::as.matrix(.)
+        
+        # Project PCA scores onto the retained ENFA space
+        test_enfa_scores <- test_scaled %*% axis_coeff
+
+        # Compute squared Mahalanobis distance to the fitted presence niche
+        d2 <- mahalanobis_d2( x = test_enfa_scores,
+                              center = model$niche_center,
+                              sigma_inv = model$sigma_inv )
+        
+        # Convert distance to continuous suitability in (0, 1] using the
+        # Chi-square upper tail probability.
+        stats::pchisq( d2, df = model$nf, lower.tail = FALSE ) %>%
+            base::as.numeric(.) %>%
+            return(.)
+    })
+}
+
 get_gam_predictor <- function()
 {
     return( function( model, data, ...)
@@ -274,25 +364,12 @@ get_glm_predictor <- function()
 
 get_gower_predictor <- function()
 {
-    get_aquarium_predictor() %>%
-        return(.)
-}
-
-get_mahal_predictor <- function()
-{
-    aquarium_predictor <- get_aquarium_predictor()
-    
-    return( function( model, data, ...)
+    function( model, data, ...)
     {
-        d2 <- 1 - aquarium_predictor( model = model,
-                                      data = data)
-        
-        stats::pchisq( q = d2,
-                       df = base::ncol( data ),
-                       lower.tail = FALSE ) %>%
+        dismo::predict( object = model, x = data ) %>%
             base::as.numeric(.) %>%
             return(.)
-    })
+    }
 }
 
 get_mars_predictor <- function()
@@ -363,18 +440,6 @@ get_svm_predictor <- function()
 }
 
 # Generic predictor closures
-get_aquarium_predictor <- function()
-{
-    function( model, data, ...)
-    {
-        dismo::predict( object = model,
-                        x = data ) %>%
-            base::as.numeric(.) %>%
-            return(.)
-        
-    }
-}
-
 get_stats_predictor <- function()
 {
     return( function( model, data, ...)
@@ -388,16 +453,6 @@ get_stats_predictor <- function()
     })
 }
 
-# Auxiliary functions
-# Get environmental variables for presence only data
-get_pres_only_data <- function( rep_tb, idx, cols = LAYER_CODES )
-{
-    pres_train <- rep_tb$resp_var[ idx ] == 1
-
-    get_var_mx( rep_tb, pres_train, cols ) %>%
-        return(.)
-}
-
 # Get training formula for GAM, GLM and MARS
 get_training_formula <- function( formula_string )
 {
@@ -406,10 +461,54 @@ get_training_formula <- function( formula_string )
         return(.)
 }
 
+# Get presence only data for BIOCLIM and Gower
+get_pres_only_data <- function( rep_tb, sel_idx, cols = LAYER_CODES )
+{
+        pres_train <- rep_tb$resp_var[ sel_idx ] == 1
+        
+        get_var_mx( rep_tb, pres_train, cols ) %>%
+            return(.)
+}
+
 # Convert data frame columns into a matrix
 get_var_mx <- function( my_data, idx, cols = LAYER_CODES )
 {
     X <- base::as.matrix( my_data[ , cols ] )
 
     return( X[ idx, , drop = TRUE ] )
+}
+
+# Calculate squared Mahalanobis distances from rows of `x` to an ENFA niche
+# centroid, using a precomputed inverse covariance matrix.
+mahalanobis_d2 <- function( x, center, sigma_inv )
+{
+    centered_x <- base::as.matrix( x ) %>%
+        base::sweep( ., 2, center, FUN = "-" )
+
+    mahal_mx <- ( centered_x %*% sigma_inv ) * centered_x
+
+    base::rowSums( mahal_mx ) %>%
+        return(.)
+}
+
+sanitize_trainer_pars <- function( rep_tb, train_idx, model_name )
+{
+    base::stopifnot( base::is.character( model_name ) )
+
+    sanitize_tb( rep_tb, "rep_tb", model_name, " trainer" )
+
+    if ( ! base::is.logical( train_idx ) )
+    {
+        stop( "`rep_tb` must be a tibble; got ",
+              base::typeof( rep_tb ), " instead from `",
+              model_name, "` trainer" )
+    }
+
+    if ( ! base::nrow( rep_tb ) == base::length( train_idx ) )
+    {
+        stop( "`rep_tb` and `train_idx` have differente lengths - `",
+              model_name, "` trainer" )
+    }
+
+    base::invisible( NULL )
 }

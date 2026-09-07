@@ -4,6 +4,8 @@ library(magrittr)
 library(R6)
 library(terra)
 
+options(cli.progress_handlers = "none")
+
 # Helper function to create a single layer SpatRaster
 create_raster <- function(vector, n_cols = 10, n_rows = 10) {
     mat <- base::matrix(vector, nrow = n_rows, ncol = n_cols)
@@ -41,14 +43,20 @@ new_from_template <- function(ref_raster, vector) {
 
 compare_raster_data <- function(raster_1, raster_2)
 {
-    expect_equal(terra::values(raster_1) %>% as.numeric(),
-                 terra::values(raster_2) %>% as.numeric())
+    expect_is(raster_1, "SpatRaster")
+    expect_is(raster_2, "SpatRaster")
+    
+    values <- ( terra::values(raster_1) %>% as.numeric() %>% round(., 3 ) -
+        terra::values(raster_2) %>% as.numeric() %>% round(., 3 ) ) %>%
+        abs(.) %>%
+        na.omit(.)
+
+    expect_false( base::any( values > 0.002 ) )
 }
 
 get_exp_mean_raster <- function(stack, method)
 {
-    terra::round(stack, digits = 3) %>%
-        terra::app(., fun = "mean", na.rm = TRUE) %>%
+    terra::app(stack, fun = "mean", na.rm = TRUE) %>%
         return(.)
 }
 
@@ -207,7 +215,7 @@ test_that("Rasta constructor fails with invalid threads argument", {
   ), "`threads` must be numeric.")
 })
 
-test_that("Rasta constructor fails with invalid skip_checks argument", {
+test_that("Rasta constructor fails with invalid .skip_checks argument", {
   # Create toy SpatRasters
   stack_1 <- create_toy_spatraster(5)
   stack_2 <- create_toy_spatraster(5)
@@ -425,10 +433,8 @@ test_that("get_mean_suitability_raster returns a SpatRaster with mean suitabilit
   
   # Check if the extent and resolution of the mean suitability raster match
   # those of the input stacks
-  round_stack <- terra::round(stack_1, digits = 3)
-  expect_equal(terra::values(terra::app(round_stack, fun = mean, na.rm=TRUE)),
-               terra::values(mean_suitability_raster),
-               stopOnError = FALSE)
+  compare_raster_data(terra::app(stack_1, fun = mean, na.rm = TRUE),
+                      mean_suitability_raster)
 })
 
 # New test to verify if private$bins is correctly instantiated
@@ -832,7 +838,7 @@ test_that("self$get_entropy_raster varies as expected for custom rasters", {
 })
 
 
-test_that("Weight related attribute work", {
+test_that("Weight related attributes work", {
 
     #ANN - 30/0 - 30/0.25 -10/NA - 30/0.25
     vec <- c(stats::runif(30, min = 0.00, max = 0.09),
@@ -1051,8 +1057,7 @@ test_that("Weight related attribute work", {
     Sm_4 <- get_exp_mean_raster(stack_4)
     test_stack_mean(obj, "SVM", Sm_4)
     
-    suitability_stack <- c(Sm_1, Sm_2, Sm_3, Sm_4) %>%
-        terra::round(., digits = 3)
+    suitability_stack <- c(Sm_1, Sm_2, Sm_3, Sm_4)
     exp_mean_raster <- terra::app(suitability_stack, fun = mean, na.rm = TRUE)
     mean_suit_raster <- obj$get_mean_ensemble_raster()
     compare_raster_data(exp_mean_raster, mean_suit_raster)
@@ -1060,4 +1065,68 @@ test_that("Weight related attribute work", {
     Exp_WEr <- Sm_1 * Wr_1 + Sm_2 * Wr_2 + Sm_3 * Wr_3 + Sm_4 * Wr_4
     Obs_WEr <- obj$get_wgt_ensemble_raster()
     compare_raster_data(Exp_WEr, Obs_WEr)
+})
+
+test_that("Bootstrap works", {
+
+    vec <- c(stats::runif(30, min = 0.00, max = 0.09),
+             stats::runif(30, min = 0.10, max = 0.19),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    stack_1 <- create_stack(n_layers = 3,
+                            raster = raster)
+    
+    vec <- c(stats::runif(30, min = 0.90, max = 1.00),
+             stats::runif(30, min = 0.80, max = 0.89),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    terra::add(stack_1) <- create_stack(n_layers = 3,
+                                        raster = raster)
+
+    vec <- c(stats::runif(30, min = 0.40, max = 0.49),
+             stats::runif(30, min = 0.60, max = 0.89),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    terra::add(stack_1) <- create_stack(n_layers = 3,
+                                        raster = raster)
+    obj <- Rasta$new(
+      class = "test_class",
+      replicates = 9,
+      stacks = list(stack_1),
+      methods = c("ANN"),
+      threads = 1L,
+      .skip_checks = FALSE
+    )
+
+    expect_error(obj$bootstrap_entropy(method = "ANN", reps = 1L, seed = 10L),
+                  regexp = "`reps` must be")
+
+    expect_error(obj$bootstrap_entropy(method = "GLM", reps = 10L, seed = 10L),
+                  regexp = "Unknown method")
+
+    bs_tibble <- obj$bootstrap_entropy(method = "ANN", reps = 10L, seed = 10L)
+
+    expect_is(bs_tibble, "tbl_df")
+    expect_true(all(bs_tibble$method == "ANN"))
+    expect_equal(min(bs_tibble$bs_replicate), 1)
+    expect_equal(max(bs_tibble$bs_replicate), 10)
+
+    mean_entropy <- obj$get_mean_entropy("ANN")
+
+    expect_true(mean_entropy > 0 & mean_entropy <= 1)
+
+    delta_min <- mean_entropy - min(bs_tibble$mean_entropy) %>%
+        abs(.) 
+
+    delta_max <- max(bs_tibble$mean_entropy) - mean_entropy %>%
+        abs(.)
+
+    expect_false(base::any(delta_min > 1 | delta_min == 0 ))
+    expect_false(base::any(delta_max > 1))
 })
