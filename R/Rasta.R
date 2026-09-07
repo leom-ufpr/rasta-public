@@ -255,11 +255,8 @@ Rasta <- R6::R6Class(
 
         if( is.null( private$mean_ensemble_raster ) )
         {
-            msg <- "Generating mean suitability raster, please wait..."
-            
-            for ( method_idx in cli::cli_progress_along( self$methods, name = msg ) )
+            for ( method in self$methods )
             {
-                method <- self$methods[[ method_idx]]
                 MSr <- ( MSr + self$get_mean_suitability_raster( method, msg = FALSE ) )
             }
 
@@ -304,11 +301,8 @@ Rasta <- R6::R6Class(
         {
             WEr <- 0
 
-            msg <- "Generating weighted ensemble raster, please wait..."
-            
-            for( method_idx in cli::cli_progress_along( self$methods, name = msg ) )
+            for( method in self$methods )
             {
-                method <- self$methods[[ method_idx ]]
                 MSr <- self$get_mean_suitability_raster( method, msg = FALSE )
                 Wr <- self$get_weight_raster( method, msg = FALSE )
                 WEr <- WEr + MSr * Wr
@@ -331,11 +325,8 @@ Rasta <- R6::R6Class(
 
         if( is.null( private$weight_stack ) )
         {
-            msg <- "Generating efficiency raster, please wait..."
-            
-            for( method_idx in cli::cli_progress_along( self$methods, name = msg ) )
+            for( method in self$methods )
             {
-                method <- self$methods[[ method_idx ]]
                 Wr <- self$get_weight_raster( method, msg = FALSE )
                 Hr <- Hr + ( Wr * log( Wr + .Machine$double.eps ) )
             }
@@ -423,6 +414,7 @@ Rasta <- R6::R6Class(
                                         bs_replicate = i,
                                         mean_entropy = mean_entropy )
         }
+        message()
 
         return( results )
     },
@@ -582,6 +574,7 @@ Rasta <- R6::R6Class(
               private$check_alignment_between()
           }
 
+          message()
           invisible( NULL )
       },
 
@@ -665,7 +658,7 @@ Rasta <- R6::R6Class(
               msg_header <- paste0( "Executing `", fun_name, "`" )
               
               if( ! is.null( method ) )
-                  { paste( msg_header, "for", fun_name ) }
+                  { paste( msg_header, "for", method ) }
 
               message( msg_header )
           }
@@ -715,7 +708,9 @@ Rasta <- R6::R6Class(
               b <- private$bins
               count_stack <- c()
 
-              for( l in 1:nrow( b ) )
+              msg <- paste0( "Binning suitability for method `", method, "`" ) 
+              
+              for( l in cli::cli_progress_along( c( 1:nrow( b ) ), name = msg ) )
               {
                   count_raster <- terra::app(
                       suit_stack,
@@ -735,6 +730,7 @@ Rasta <- R6::R6Class(
 
                   count_stack <- c( count_stack, count_raster )
               }
+              message()
               
               private$count_stack_list[[ method ]] <- terra::rast( count_stack )
           }
