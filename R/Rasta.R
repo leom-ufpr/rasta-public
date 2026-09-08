@@ -323,18 +323,18 @@ Rasta <- R6::R6Class(
     {
         Hr <- 0
 
-        if( is.null( private$weight_stack ) )
+        if( is.null( private$efficiency_raster ) )
         {
             for( method in self$methods )
             {
                 Wr <- self$get_weight_raster( method, msg = FALSE )
                 Hr <- Hr + ( Wr * log( Wr + .Machine$double.eps ) )
             }
+            
+            max_h <- log( length( self$methods ) )        
+            private$efficiency_raster <- Hr / max_h * (-1)
         }
 
-        max_h <- log( length( self$methods ) )        
-        private$efficiency_raster <- Hr / max_h * (-1)
-        
         return( private$efficiency_raster )
     },
 
