@@ -2,28 +2,29 @@
 The pipeline depends on several packages, some of which may be available in your R installations:
 
 ```
-install.packages( "assertthat", "biomod2", "blockCV", "cli", "dismo", "dplyr", "e1071", "earth",
-"future.apply", "progressr", "mgcv", "predicts", "PresenceAbsence", "PROC", "raster",
-"remotes", "sdm", "spThin", "terra", "tidyr", dependencies = TRUE )
+install.packages(c("assertthat", "biomod2", "blockCV", "cli", "dplyr", "e1071", "earth",
+                   "future.apply", "mgcv", "predicts", "PresenceAbsence", "PROC", "raster",
+                   "remotes", "sdm", "sf", "spThin", "terra", "tidyr"), dependencies = TRUE)
 ```
 
-If you run R in a conda environment, run in terminal (includes some `blockCV` dependencies, but the package is not avilable via Anaconda)
+If you run R in a conda environment, run in terminal (includes some `blockCV` dependencies, but the package is not available via Anaconda)
 
 ```
 # After activating the environment, run in your terminal
-conda install -c conda-forge r-assertthat r-biomod2 r-cli r-dismo r-dplyr r-e1071 r-earth \
-r-future.apply r-logr, r-mgcv r-presenceabsence r-predicts r-proc r-progressr r-raster \
+conda install -c conda-forge r-assertthat r-biomod2 r-cli r-dplyr r-e1071 r-earth \
+r-future.apply r-mgcv r-presenceabsence r-predicts r-proc r-raster \
 r-remotes r-sf r-shiny r-spthin, r-terra r-tidyr
 
 conda install -c bioconda sdm
 
 # Within the R console
-install.packages( "blockCV", dependencies=TRUE ) 
+install.packages("blockCV", dependencies=TRUE) 
 
-### WARNING - h2o may conflict with the your JDK version and fail to start, check appropriate homepages for help ###
-install.packages( "h2o",
+### WARNING - h2o may conflict with your JDK version and fail to start, check appropriate homepages for help ###
+install.packages("h2o",
   type = "source",
-  repos = "https://h2o-release.s3.amazonaws.com/h2o/latest_stable_R" )
+  repos = "https://h2o-release.s3.amazonaws.com/h2o/latest_stable_R"
+)
 
 ```
 
@@ -40,29 +41,28 @@ remotes::install_github("mrmaxent/maxnet")
 1. In the R console, set the working directory, using `base::setwd` (or the graphical interface in R Studio), to `pipeline`, in the `Rasta` folder cloned from GitHub, e.g:
 
 ```
-setwd( "/path/to/base/folder/Rasta/pipeline" )
+setwd("/path/to/base/folder/Rasta/pipeline")
 ```
 
-2. Run the first script to get a tibble with the median range (in meters), for each cutout. The tibble will be saved, in the folder `output`, and subsequently used to set the `blocCV` grid size in the next step. The script will also save `blockCV` objects used to compute spatial autoccorelation, aligned environmental SpatRaster stacks (as `grd` files) for all cutouts, plus their corresponding shallow areas stacks.  
+2. Run the first script to get a tibble with the median range (in meters), for each cutout. The tibble will be saved, in the folder `output`, and subsequently used to set the `blockCV` grid size in the next step. The script will also save `blockCV` objects used to compute spatial autocorelation, aligned environmental SpatRaster stacks (as `grd` files) for all cutouts, plus their corresponding shallow areas stacks.
 
 ```
-source( "config/compute_autocorr.R" )
+source("config/compute_autocorr.R")
 ```
 
-3. You might want to change the number of cores (default = 4L) by editing the global variable `N_CORES` in the script `config/make_buffered_folds.R`. The greater the number of cores, the faster the script will run. It is **not advisable** to change the other parameters if you want to reproduce the data in the paper. This step will save three (large) tibbles as RDS files, one for each cutout. Theses tibbles have 120 pseudo-replicates, consisting of environmental variables and coordinates corresponding to a set of presence points sampled using `spThin` and 10.000 pseudo-absence points, sampled outside of the 10 km buffer zone around occurences. Points were also grouped in 5 folds by `blockCV`. Run the script using the line:
+3. You might want to change the number of cores (default = 4L) by editing the global variable `N_CORES` in the script `config/make_buffered_folds.R`. The greater the number of cores, the faster the script will run. It is **not advisable** to change the other parameters if you want to reproduce the data in the paper. This step will save three (large) tibbles as RDS files, one for each cutout. These tibbles have 120 pseudo-replicates, consisting of environmental variables and coordinates corresponding to a set of presence points sampled using `spThin` and 10.000 pseudo-absence points, sampled outside of the 10 km buffer zone around occurrences. Points were also grouped in 5 folds by `blockCV`. Run the script using the line:
 
 ```
-source( "config/make_buffered_folds.R" )
+source("config/make_buffered_folds.R")
 ```
 
-4. The next step conducts parameter selection and model evaluation via cross-validation. The script saves a list with the results of the tuning parameter selection as tibbles, the parameter grid use in parameter search and the best parameters selected for each method. It laso saves another tibble with the evaluation results for the 100 last replicates selected in the previous step. Again, you may change the N_CORES parameter according to your machine specs.
+4. The next step conducts parameter selection and model evaluation via cross-validation. The script saves a list with the results of the tuning parameter selection as tibbles, the parameter grid used in parameter search, and the best parameters selected for each method. It also saves another tibble with the evaluation results for the 100 last replicates selected in the previous step. Again, you may change the `N_CORES` parameter according to your machine specs.
 
 ```
-source( "config/optimize_models.R" )
+source("config/optimize_models.R")
 ```
 
-5. In the final step, each model is trained using the data for each replicate stored in the tibble generated by `make_buffered_folds.R` and generalizations for each trained replicate is conducted on the full Atlantic cutout. GeoTIFF files, corresponding to the stacks of 100 `SpatRasters` for each model are saved as raw and binarized predictions. After setting the number of cores, run the script using:
+5. In the final step, each model is trained using the data for each replicate stored in the tibble generated by `make_buffered_folds.R`, and generalizations for each trained replicate are conducted on the full Atlantic cutout. GeoTIFF files, corresponding to the stacks of 100 `SpatRasters` for each model, are saved as raw and binarized predictions. After setting the number of cores, run the script using:
 
 ```
-source( "config/generalize_models.R" )
-```
+source("config/generalize_models.R")
