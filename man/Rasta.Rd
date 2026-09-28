@@ -90,7 +90,7 @@ Default is FALSE.}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A new Rasta object invisibly.
+    A new \code{Rasta} object.
   }
 }
 
@@ -98,23 +98,21 @@ Default is FALSE.}
 \if{html}{\out{<a id="method-Rasta-get_entropy_raster"></a>}}
 \if{latex}{\out{\hypertarget{method-Rasta-get_entropy_raster}{}}}
 \subsection{\code{Rasta$get_entropy_raster()}}{
-  Get the entropy raster for a given method
+  Get the Rao's entropy raster for a given method
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Rasta$get_entropy_raster(method, msg = TRUE)}
+    \preformatted{Rasta$get_entropy_raster(method)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{method}}{Character string. Name of the ENM method.}
-      \item{\code{msg}}{Logical. Whether function execution message should be printed
-or not.}
+      \item{\code{method}}{Character string corresponding to the name of the ENM method.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A SpatRaster object with Rao's entropy values.
+    A \code{SpatRaster}.
   }
 }
 
@@ -122,23 +120,21 @@ or not.}
 \if{html}{\out{<a id="method-Rasta-get_mean_suitability_raster"></a>}}
 \if{latex}{\out{\hypertarget{method-Rasta-get_mean_suitability_raster}{}}}
 \subsection{\code{Rasta$get_mean_suitability_raster()}}{
-  Get the mean suitability raster computed across the multilayer suitability
+  Get the mean suitability raster, averaged across the multilayer suitability
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Rasta$get_mean_suitability_raster(method, msg = TRUE)}
+    \preformatted{Rasta$get_mean_suitability_raster(method)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{method}}{Character string. Name of the ENM method.}
-      \item{\code{msg}}{Logical. Whether function execution message should be printed
-or not.}
+      \item{\code{method}}{Character string corresponding to the name of the ENM method.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A \code{SpatRaster} with mean suitability values.
+    A \code{SpatRaster}.
   }
 }
 
@@ -146,15 +142,15 @@ or not.}
 \if{html}{\out{<a id="method-Rasta-get_mean_ensemble_raster"></a>}}
 \if{latex}{\out{\hypertarget{method-Rasta-get_mean_ensemble_raster}{}}}
 \subsection{\code{Rasta$get_mean_ensemble_raster()}}{
-  Get the mean suitability raster computed across ALL methods multilayer
-suitability \code{SpatRasters}
+  Get the per-cell means of the ensemble suitabilities, i.e., computed
+across ALL suitability \code{SpatRasters}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Rasta$get_mean_ensemble_raster()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A \code{SpatRaster} with mean suitability values.
+    A \code{SpatRaster}.
   }
 }
 
@@ -162,23 +158,21 @@ suitability \code{SpatRasters}
 \if{html}{\out{<a id="method-Rasta-get_weight_raster"></a>}}
 \if{latex}{\out{\hypertarget{method-Rasta-get_weight_raster}{}}}
 \subsection{\code{Rasta$get_weight_raster()}}{
-  Get the weight raster for a given method
+  Get the raster with the per-cell ensemble weights of a method.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Rasta$get_weight_raster(method, msg = TRUE)}
+    \preformatted{Rasta$get_weight_raster(method)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{method}}{Character string. Name of the ENM method.}
-      \item{\code{msg}}{Logical. Whether function execution message should be printed
-or not.}
+      \item{\code{method}}{Character string corresponding to the name of the ENM method.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A SpatRaster with raster weights.
+    A \code{SpatRaster}.
   }
 }
 
@@ -186,14 +180,14 @@ or not.}
 \if{html}{\out{<a id="method-Rasta-get_wgt_ensemble_raster"></a>}}
 \if{latex}{\out{\hypertarget{method-Rasta-get_wgt_ensemble_raster}{}}}
 \subsection{\code{Rasta$get_wgt_ensemble_raster()}}{
-  Get the raster with weighted mean ensemble suitabilities.
+  Get the raster with the per-cell weighted means of ensemble suitabilities.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Rasta$get_wgt_ensemble_raster()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A \code{SpatRaster} with weighted mean ensemble suitabilities.
+    A \code{SpatRaster}.
   }
 }
 
@@ -202,14 +196,14 @@ or not.}
 \if{latex}{\out{\hypertarget{method-Rasta-get_efficiency_raster}{}}}
 \subsection{\code{Rasta$get_efficiency_raster()}}{
   Get the efficiency raster, i.e., the raster with the normalized Shannon
-entropy computed using weights
+entropy, computed using weights as proportions.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Rasta$get_efficiency_raster()}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A \code{SpatRaster} with efficiency values.
+    A \code{SpatRaster}.
   }
 }
 
@@ -217,23 +211,22 @@ entropy computed using weights
 \if{html}{\out{<a id="method-Rasta-get_mean_entropy"></a>}}
 \if{latex}{\out{\hypertarget{method-Rasta-get_mean_entropy}{}}}
 \subsection{\code{Rasta$get_mean_entropy()}}{
-  Get the mean entropy for a given method
+  Get the mean Rao's entropy for a given method.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Rasta$get_mean_entropy(method, msg = TRUE)}
+    \preformatted{Rasta$get_mean_entropy(method)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{method}}{Character string. Name of the ENM method.}
-      \item{\code{msg}}{Logical. Whether function execution message should be printed
-or not.}
+      \item{\code{method}}{Character string with the name of the ENM method.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A single value representing the mean raster entropy.
+    A numeric value representing the global raster entropy for the
+raster.
   }
 }
 
@@ -244,7 +237,7 @@ or not.}
   Bootstrap the entropy for a given method
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Rasta$bootstrap_entropy(method, reps, seed = 1L)}
+    \preformatted{Rasta$bootstrap_entropy(method, reps = 100, seed = 1L)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -257,7 +250,7 @@ or not.}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A tibble with columns: method, bs_replicate, and log_mean_entropy.
+    A \code{tibble} with columns \code{method}, \code{bs_replicate}, and \code{mean_entropy}.
   }
 }
 
@@ -266,7 +259,7 @@ or not.}
 \if{latex}{\out{\hypertarget{method-Rasta-test_private}{}}}
 \subsection{\code{Rasta$test_private()}}{
   Function that allows access to private attributes and functions for testing.
-Do not use unless you are a developer,
+DO NOT USE unless you are a developer.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Rasta$test_private(name = NULL, tag = "attrb", args = list())}

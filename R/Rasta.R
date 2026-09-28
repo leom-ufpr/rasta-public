@@ -52,7 +52,7 @@ Rasta <- R6::R6Class(
     #' @param .skip_checks Logical. If TRUE, skip internal checks on SpatRasters.
     #'   Default is FALSE.
     #'
-    #' @return A new Rasta object invisibly.
+    #' @return A new `Rasta` object.
     initialize = function( class, replicates, intervals = 10L, methods = NULL,
                            stacks = NULL, threads = 1L, .skip_checks = FALSE )
     {
@@ -172,18 +172,14 @@ Rasta <- R6::R6Class(
     },
 
     #' @description
-    #' Get the entropy raster for a given method
+    #' Get the Rao's entropy raster for a given method
     #'
-    #' @param method Character string. Name of the ENM method.
-    #' @param msg Logical. Whether function execution message should be printed
-    #' or not.
+    #' @param method Character string corresponding to the name of the ENM method.
     #'
-    #' @return A SpatRaster object with Rao's entropy values.
-    get_entropy_raster = function( method, msg = TRUE )
+    #' @return A `SpatRaster`.
+    get_entropy_raster = function( method )
     {
         private$check_method( method )
-
-        private$print_message( "get_entropy_raster", method, msg )
 
         if ( ! private$has_raster( "entropy_stack", method ) )
         {
@@ -215,19 +211,15 @@ Rasta <- R6::R6Class(
     },
     
     #' @description
-    #' Get the mean suitability raster computed across the multilayer suitability
-    # `SpatRasters` for the  method passed as argument to the function
+    #' Get the mean suitability raster, averaged across the multilayer suitability
+    # `SpatRasters` for the  method passed as argument to the function.
     #'
-    #' @param method Character string. Name of the ENM method.
-    #' @param msg Logical. Whether function execution message should be printed
-    #' or not.
+    #' @param method Character string corresponding to the name of the ENM method.
     #'  
-    #' @return A `SpatRaster` with mean suitability values.
-    get_mean_suitability_raster = function( method, msg = TRUE )
+    #' @return A `SpatRaster`.
+    get_mean_suitability_raster = function( method )
     {
         private$check_method( method )
-
-        private$print_message( "get_mean_suitability_raster", method, msg )
 
         add_mean_suitability_raster <- length( private$mean_suitability_stack ) == 0 |
             ! private$has_raster( "mean_suitability_stack", method )
@@ -245,10 +237,10 @@ Rasta <- R6::R6Class(
     },
 
     #' @description
-    #' Get the mean suitability raster computed across ALL methods multilayer
-    #' suitability `SpatRasters`
+    #' Get the per-cell means of the ensemble suitabilities, i.e., computed
+    #' across ALL suitability `SpatRasters`.
     #'  
-    #' @return A `SpatRaster` with mean suitability values.
+    #' @return A `SpatRaster`.
     get_mean_ensemble_raster = function()
     {
         MSr <- 0
@@ -257,7 +249,7 @@ Rasta <- R6::R6Class(
         {
             for ( method in self$methods )
             {
-                MSr <- ( MSr + self$get_mean_suitability_raster( method, msg = FALSE ) )
+                MSr <- ( MSr + self$get_mean_suitability_raster( method ) )
             }
 
             private$mean_ensemble_raster <- MSr / length( self$methods )
@@ -267,23 +259,19 @@ Rasta <- R6::R6Class(
     },
 
     #' @description
-    #' Get the weight raster for a given method
+    #' Get the raster with the per-cell ensemble weights of a method.
     #'
-    #' @param method Character string. Name of the ENM method.
-    #' @param msg Logical. Whether function execution message should be printed
-    #' or not.
+    #' @param method Character string corresponding to the name of the ENM method.
     #'
-    #' @return A SpatRaster with raster weights.
-    get_weight_raster = function( method, msg = TRUE )
+    #' @return A `SpatRaster`.
+    get_weight_raster = function( method )
     {
         private$check_method( method )
 
-        private$print_message( "get_weight_raster", method, msg )
-        
         if ( ! private$has_raster( "weight_stack", method ) )
         {
             Wd <- private$get_weight_denominator()
-            Wr <- ( 1 - self$get_entropy_raster( method, msg = FALSE ) ) / Wd
+            Wr <- ( 1 - self$get_entropy_raster( method ) ) / Wd
             
             private$add_to_stack( "weight_stack", Wr, method )
         }
@@ -292,9 +280,9 @@ Rasta <- R6::R6Class(
     },
 
     #' @description
-    #' Get the raster with weighted mean ensemble suitabilities.
+    #' Get the raster with the per-cell weighted means of ensemble suitabilities.
     #'
-    #' @return A `SpatRaster` with weighted mean ensemble suitabilities.
+    #' @return A `SpatRaster`.
     get_wgt_ensemble_raster = function()
     {
         if ( is.null( private$wgt_ensemble_raster ) )
@@ -303,8 +291,8 @@ Rasta <- R6::R6Class(
 
             for( method in self$methods )
             {
-                MSr <- self$get_mean_suitability_raster( method, msg = FALSE )
-                Wr <- self$get_weight_raster( method, msg = FALSE )
+                MSr <- self$get_mean_suitability_raster( method )
+                Wr <- self$get_weight_raster( method )
                 WEr <- WEr + MSr * Wr
             }
 
@@ -316,9 +304,9 @@ Rasta <- R6::R6Class(
 
     #' @description
     #' Get the efficiency raster, i.e., the raster with the normalized Shannon
-    #' entropy computed using weights
+    #' entropy, computed using weights as proportions.
     #'
-    #' @return A `SpatRaster` with efficiency values.
+    #' @return A `SpatRaster`.
     get_efficiency_raster = function()
     {
         Hr <- 0
@@ -327,7 +315,7 @@ Rasta <- R6::R6Class(
         {
             for( method in self$methods )
             {
-                Wr <- self$get_weight_raster( method, msg = FALSE )
+                Wr <- self$get_weight_raster( method )
                 Hr <- Hr + ( Wr * log( Wr + .Machine$double.eps ) )
             }
             
@@ -339,20 +327,17 @@ Rasta <- R6::R6Class(
     },
 
     #' @description
-    #' Get the mean entropy for a given method
+    #' Get the mean Rao's entropy for a given method.
     #'
-    #' @param method Character string. Name of the ENM method.
-    #' @param msg Logical. Whether function execution message should be printed
-    #' or not.
+    #' @param method Character string with the name of the ENM method.
     #'
-    #' @return A single value representing the mean raster entropy.
-    get_mean_entropy = function( method, msg = TRUE )
+    #' @return A numeric value representing the global raster entropy for the
+    #' raster.
+    get_mean_entropy = function( method )
     {
         private$check_method( method )
 
-        private$print_message( "get_mean_entropy", method, msg )
-
-        Qr <- self$get_entropy_raster( method, msg = FALSE )
+        Qr <- self$get_entropy_raster( method ) 
         mean_entropy <- terra::global( Qr,
                                        fun = "mean",
                                        na.rm = TRUE )
@@ -367,61 +352,68 @@ Rasta <- R6::R6Class(
     #' @param reps Integer. Number of bootstrap pseudo-replicates.
     #' @param seed Numeric. Seed value for random number generation.
     #'
-    #' @return A tibble with columns: method, bs_replicate, and log_mean_entropy.
-    bootstrap_entropy = function( method, reps, seed = 1L )
+    #' @return A `tibble` with columns `method`, `bs_replicate`, and `mean_entropy`.
+    bootstrap_entropy = function( method, reps = 100, seed = 1L )
     {
         private$check_method( method )
 
-        if ( ! private$is_positive_integer( reps ) | reps < 2L )
+        if( is.null( private$bs_tibble[[ method ]] ) )
         {
-            stop( "`reps` must be a positive integer greater than or equal to 2." )
+            if ( ! private$is_positive_integer( reps ) | reps < 2L )
+            {
+                stop( "`reps` must be a positive integer greater than or equal to 2." )
+            }
+
+            if ( ! is.numeric( seed ) )
+            {
+                stop( "`seed` must be numeric." )
+            }
+
+            bs_tibble <- tibble::tibble( method = factor(),
+                                         bs_replicate = integer(),
+                                         mean_entropy = numeric() )
+
+            msg <- paste0( "Bootstrapping`", method ,"`entropy" )
+
+            bin_matrix <- private$get_binned_matrix( method )
+            
+            compute_entropy <- private$get_entropy_fun()
+
+            for ( i in cli::cli_progress_along( 1:reps, name = msg ) )
+            {
+                set.seed( seed + ( i - 1 ) * 10 )
+
+                indices <- sample( 1:self$replicates,
+                                   size = self$replicates,
+                                   replace = TRUE )
+
+                rep_mat <- bin_matrix[ indices, ]
+
+                n_bins <- nrow( private$bins )
+
+                count_matrix <- vapply( seq_len( n_bins ),
+                                        function( b ) Rfast::colsums( rep_mat == b ),
+                                        numeric( ncol( rep_mat ) ) )
+
+                Qv <- apply( t( count_matrix ), 2L, compute_entropy )
+
+                bs_tibble <- tibble::add_row( bs_tibble,
+                                              method = method,
+                                              bs_replicate = i,
+                                              mean_entropy = mean( Qv ) )
+            }
+
+            private$bs_tibble[[ method ]] <- bs_tibble
+
+            message()
         }
 
-        if ( ! is.numeric( seed ) )
-        {
-            stop( "`seed` must be numeric." )
-        }
-
-        results <- tibble::tibble( method = factor(),
-                                   bs_replicate = integer(),
-                                   mean_entropy = numeric() )
-
-        msg <- "Bootstrapping entropy, please wait..."
-        
-        for ( i in cli::cli_progress_along( 1:reps, name = msg ) )
-        {
-            set.seed( seed + ( i - 1 ) * 10 )
-
-            indices <- sample( 1:self$replicates,
-                               size = self$replicates,
-                               replace = TRUE )
-
-            bootstrapped_stack <- terra::subset( private$suit_stack_list[[ method ]],
-                                                 indices )
-
-            boot_rasta <- Rasta$new( class = self$class,
-                                     replicates = self$replicates,
-                                     intervals = self$intervals,
-                                     stacks = list( bootstrapped_stack ),
-                                     methods = method,
-                                     threads = self$threads,
-                                     .skip_checks = TRUE )
-
-            mean_entropy <- boot_rasta$get_mean_entropy( method, msg = FALSE )
-
-            results <- tibble::add_row( results,
-                                        method = method,
-                                        bs_replicate = i,
-                                        mean_entropy = mean_entropy )
-        }
-        message()
-
-        return( results )
+        return( private$bs_tibble[[ method ]] )
     },
 
     #' @description
     #' Function that allows access to private attributes and functions for testing.
-    #' Do not use unless you are a developer,
+    #' DO NOT USE unless you are a developer.
     #' 
     #' @param name Character string. Name of private attribute or function.
     #' @param tag Character. Tag identifying if attribute or function is being
@@ -462,6 +454,9 @@ Rasta <- R6::R6Class(
 
       # bins Matrix with intervals used to bin suitability values
       bins = matrix(),
+
+      # bs_tibble Tibble with bootstrapped entropy values
+      bs_tibble = list(),
       
       # distance_matrix Vector with midpoint deltas used to compute Q
       dist_matrix = matrix(),
@@ -708,7 +703,7 @@ Rasta <- R6::R6Class(
               b <- private$bins
               count_stack <- c()
 
-              msg <- paste0( "Binning suitability for method `", method, "`" ) 
+              msg <- paste0( "Binning `", method, "` suitbalility" ) 
               
               for( l in cli::cli_progress_along( c( 1:nrow( b ) ), name = msg ) )
               {
@@ -763,7 +758,7 @@ Rasta <- R6::R6Class(
 
               for( method in self$methods )
               {
-                  Qs <- c( Qs, self$get_entropy_raster( method, msg = FALSE ) )
+                  Qs <- c( Qs, self$get_entropy_raster( method ) )
               }
 
               M <- length( self$methods )
@@ -773,6 +768,57 @@ Rasta <- R6::R6Class(
           }
 
           return( private$weight_denominator )
+      },
+
+      # Get matrix of binned suitability values corresponding to the method
+      # passed as argument
+      get_binned_matrix = function( method )
+      {
+          private$check_method( method )
+
+          method_raster <- private$suit_stack_list[[ method ]]
+          
+          suit_mat <- t( terra::values( method_raster, mat = TRUE ) )
+          suit_mat <- unname( suit_mat )
+          value_columns <- ! is.na( suit_mat[ 1, ] )
+          bin_matrix <- suit_mat[ , value_columns ]
+
+          bins <- private$bins
+
+          for( l in 1:nrow( bins ) )
+          {
+              idx_mat <- bin_matrix < bins[ l, 2 ]
+              bin_matrix[ idx_mat ] <- l + 1
+          }
+          
+          bin_matrix <- bin_matrix - 1
+          storage.mode( bin_matrix ) <- "integer"
+
+          return( bin_matrix )
+      },
+
+      # Return function to compute Rao's entropy for vectors passed as arguments
+      get_entropy_fun = function()
+      {
+            d <- private$dist_matrix
+            r <- nrow( d )
+            b <- seq_len( r )
+            n <- self$replicates
+            m <- private$max_q
+
+            return( function( x )
+            {
+                stopifnot( is.vector( x ) )
+                
+                idx <- b %in% ( names( x ) %>% as.numeric() )
+                p <- rep( 0, r )
+                p[ idx ] <- unlist( x ) %>% unname(.)
+                p <- p / n
+
+                t( p ) %*% d %*% p %>%
+                    as.numeric(.) / m %>%
+                    return(.)
+            } )
       },
       
       # Set midpoints attribute

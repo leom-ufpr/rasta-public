@@ -190,13 +190,14 @@ radians_rasta <- Rasta$new( class = code,
                             replicates = 100,
 			    stacks = RAST_LIST,
 			    methods = methods )
+```
 
 ### 3\. Getting results
 
 Most `Rasta` methods return standard `SpatRaster` objects, which can be plotted or saved immediately. The first call to a method will likely take a while due to expensive raster algebra, but subsequent method calls will return results faster because they will take advantage of previous computations. Expensive data are internally stored so a second call to the same method function will return the stored object in no time.
-
-Start by checking object's metadata:
 ```
+Start by checking object's metadata:
+
 radians_rasta$replicates # Returns 100
 radians_rasta$intervals # Returns 10
 all(methods %in% radians_rasta$methods) # Returns TRUE
@@ -289,159 +290,69 @@ radians_bioclim_mean_entropy <- radians_rasta$get_mean_entropy("bioclim")
 
 ## Class Reference: `Rasta`
 
-The `RastaStash` class is the workhorse of the package, designed to instantiate rich objects containing all necessary methods to implement ensemble learning in Ecological Niche Modeling (ENM) using information theory.
+The `Rasta` class is designed to apply information theory to ensemble learning in ENM by combining outcomes from several ENM models. Data are stored as multilayer `terra` `SpatRaster` objects that can be provided at initialization or added later via the `add()` method.
 
-### Public Methods
+### Fields
+- **class**: Character string. The broad category defining the data (e.g., species name).
+- **replicates**: Integer. Number of layers per suitability stack; must be equal across all methods.
+- **intervals**: Integer. Number of intervals used to bin suitability scores.
+- **methods**: Vector of ENM method names corresponding to stacks.
+- **threads**: Integer. Number of threads for parallelized operations.
+- **.skip_checks**: Used for internal object instantiation.
 
-#### Constructors
+### Methods
+- **initialize(class, replicates, intervals = 10L, methods = NULL, stacks = NULL, threads = 1L, .skip_checks = FALSE)**: Initialize a new `Rasta` object.
+  - **class**: Character string. The broad category defining the data (e.g., species, population). Mandatory, no default.
+  - **replicates**: Integer. Number of layers per SpatRaster. Mandatory, must be >= 2, no default.
+  - **intervals**: Integer. Number of intervals for discretized suitability scores. Must be between 2 and floor(replicates/2). Default is 10L.
+  - **stacks**: List of terra SpatRaster objects. Optional, can be NULL for empty initialization. If provided, must match length of `methods`.
+  - **methods**: Character vector of ENM method names. Must match length of `stacks`. Default is NULL or empty character vector.
+  - **threads**: Integer. Number of threads for parallelization. Default is 1L. Maximum should not exceed available cores.
+  - **.skip_checks**: Logical. If TRUE, skip internal checks on SpatRasters. Default is FALSE.
 
-#### `new(...)`
-Creates a new `RastaStash` object.
+- **get_entropy_raster(method)**: Get the Rao's entropy raster for a given method.
+  - **method**: Character string corresponding to the name of the ENM method.
 
-* **Parameters**:
-    * `stash`: (Optional) A list of `RastaLand` or `RastaStash` objects. If omitted, returns an empty object that can be populated later using `add()`.
-    * `.enforce_binary`: (Logical, Dev only) Default: `TRUE`.
-    * `.profile`: (Logical, Dev only) Default: `FALSE`.
-    * `.verbosity`: (Integer, Dev only) Default: `0`.
-* **Returns**: A new `RastaStash` object.
-* **Details**: You may pass a mixed list of `RastaStash` and `RastaLand` objects. Ensure all objects share the same `class` attribute and identical replicate counts.
+- **get_mean_suitability_raster(method)**: Get the mean suitability raster, averaged across the multilayer suitability `SpatRasters` for the method passed as argument to the function.
+  - **method**: Character string corresponding to the name of the ENM method.
 
-#### `add(rasta_object)`
-Populates the stash with `RastaLand` objects or other `RastaStash` objects.
+- **get_mean_ensemble_raster()**: Get the per-cell means of the ensemble suitabilities, i.e., computed across ALL suitability `SpatRasters`.
 
-* **Parameters**:
-    * `rasta_object`: A valid `RastaLand` or `RastaStash` object.
-* **Returns**: `TRUE` if the object was correctly added.
-* **Details**: Ensures consistency in `class` attributes and replicate counts before adding.
+- **get_weight_raster(method)**: Get the raster with the per-cell ensemble weights of a method.
+  - **method**: Character string corresponding to the name of the ENM method.
 
-#### Metadata acessors
+- **get_wgt_ensemble_raster()**: Get the raster with the per-cell weighted means of ensemble suitabilities.
 
-#### `get_class()`
-Accessor to the object's class label (e.g., the taxon name).
+- **get_efficiency_raster()**: Get the efficiency raster, i.e., the raster with the normalized Shannon entropy, computed using weights as proportions.
 
-* **Returns**: A string representing the class label, or `NULL` if the stash is empty.
+- **get_mean_entropy(method)**: Get the mean Rao's entropy for a given method.
+  - **method**: Character string with the name of the ENM method.
 
-#### `get_all()`
-Retrieves all objects stored in the stash.
+- **bootstrap_entropy(method, reps = 100, seed = 1L)**: Bootstrap the entropy for a given method.
+  - **method**: Character string. Name of the ENM method.
+  - **reps**: Integer. Number of bootstrap pseudo-replicates.
+  - **seed**: Numeric. Seed value for random number generation.
 
-* **Returns**: A list of all `RastaLand` objects currently in the stash. Returns an empty list if the stash is empty.
-
-#### `get_by_index(i)`
-Accessor to `RastaLand` objects based on their order in the stash.
-
-* **Parameters**:
-    * `i`: Positive integer corresponding to the object index.
-* **Returns**: A `RastaLand` object or `NULL` if empty.
-
-#### `get_by_method(method)`
-Accessor to `RastaLand` objects generated by a specific SDM algorithm.
-
-* **Parameters**:
-    * `method`: A string representing a valid method name (e.g., "ann", "glm").
-* **Returns**: A list of `RastaLand` objects.
-
-#### `get_by_rep(i)`
-Accessor to `RastaLand` objects corresponding to a specific replicate number, regardless of the algorithm used.
-
-* **Parameters**:
-    * `i`: Integer corresponding to a valid replicate number.
-* **Returns**: A list of `RastaLand` objects.
-
-#### `get_methods()`
-Lists all SDM algorithms contained in the stash.
-
-* **Returns**: A vector of method names in alphabetical order.
-
-#### `get_method_count()`
-Returns the number of unique methods (SDM algorithms) in the stash.
-
-* **Returns**: A positive integer (or 0 if empty).
-
-#### `get_method_count_list()`
-Returns a count of `RastaLand` objects per method.
-
-* **Returns**: A list indexed by method names containing the object counts.
-
-#### `get_rep_count()`
-Returns the number of replicates used to generate the stash.
-
-* **Returns**: A positive integer (or 0 if empty).
-
-#### `get_rasta_land_count()`
-Accessor to the total number of `RastaLand` objects in the stash.
-
-* **Returns**: An integer (> 0 for populated objects).
-
-#### `get_raster_size()`
-Accessor to the raster size (count of non-NA pixels).
-
-* **Returns**: An integer, or `NULL` if empty.
-
-#### `has_stash()`
-Checks if the object is populated.
-
-* **Returns**: `TRUE` if populated with `RastaLand` objects; `FALSE` otherwise.
-
-#### `has_methods()`
-Checks if the method list has been internally assembled.
-
-* **Returns**: `TRUE` if populated and methods are assembled; `FALSE` otherwise.
-
-#### Data methods
-
-#### `bootstrap_uncertainty(bs_reps = NULL, bs_matrix = NULL)`
-Bootstraps uncertainty by random re-sampling of the binary rasters.
-
-* **Parameters**:
-    * `bs_reps`: Integer. Number of desired pseudo-replicates. Defaults to the number of replicates in the stash if omitted.
-    * `bs_matrix`: A design matrix to enforce a repeated measures design. If provided, `bs_reps` is ignored.
-* **Returns**: A list containing:
-    1.  `bs_uncertainty`: Vector of bootstrapped uncertainty values.
-    2.  `bs_matrix`: The design matrix used.
-* **Details**: Calculates uncertainty as the sum of pixel entropies. Passing a `bs_matrix` allows you to ensure the same resampling experiments are used across different algorithms (e.g., ensuring ANN and GLM use the same validation sets).
-
-#### `get_uncertainty()`
-Calculates the total uncertainty of the stash.
-
-* **Returns**: A numeric value representing the sum of entropies of every pixel in the uncertainty raster.
-
-#### `get_uncertainty_raster()`
-Retrieves the spatial uncertainty representation.
-
-* **Returns**: A `RasterLayer` object representing uncertainty.
-
-#### `get_prob_raster()`
-Retrieves the unweighted probability raster (voting).
-
-* **Returns**: A `RasterLayer` object.
-
-#### `get_wgt_prob_raster()`
-Retrieves the weighted probability raster.
-
-* **Returns**: A `RasterLayer` object.
-
-#### `get_weight_stack()`
-Retrieves the weights computed for each algorithm.
-
-* **Returns**: A `RasterStack` object containing the weights.
+- **test_private(name = NULL, tag = "attrb", args = list())**: Function that allows access to private attributes and functions for testing. DO NOT USE unless you are a developer.
+  - **name**: Character string. Name of private attribute or function.
+  - **tag**: Character. Tag identifying if attribute or function is being called.
+  - **args**: List. List of arguments to be passed to private function.
 
 ## Requirements
 
 The package requires **R (>= 3.5.0)** and the following dependencies:
 
+Imports:
 * **assertthat** (>= 0.2.1)
-* **doFuture** (>= 1.1.2)
 * **dplyr** (>= 1.1.4)
-* **envnames** (>= 0.2.1)
-* **foreach** (>= 1.5.2)
-* **future** (>= 1.68.0)
 * **magrittr** (>= 2.0.4)
-* **progressr** (>= 0.18.0)
 * **R6** (>= 2.5.1)
 * **raster** (>= 3.6.30)
 * **Rfast** (>= 2.1.0)
 * **terra** (>= 1.8.86)
 * **tibble** (>= 3.2.1)
+Suggests:
+* **testthat** (>= 3.2.1.1)
 
 ## License
 

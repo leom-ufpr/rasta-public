@@ -1069,6 +1069,41 @@ test_that("Weight related attributes work", {
 
 test_that("Bootstrap works", {
 
+    vec <- c(stats::runif(30, min = 0.90, max = 1.00),
+             stats::runif(30, min = 0.80, max = 0.89),
+             rep(NA, 10),
+             stats::runif(30, min = 0.20, max = 0.29))
+
+    raster <- create_raster(vec)
+    stack_1 <- create_stack(n_layers = 3,
+                            raster = raster)
+    obj <- Rasta$new(
+      class = "test_class",
+      replicates = 3,
+      stacks = list(stack_1),
+      methods = c("ANN"),
+      threads = 1L,
+      .skip_checks = FALSE
+    )
+
+    binned_matrix <- obj$test_private( name = "get_binned_matrix",
+                                       tag = "function",
+                                       args = list( "ANN" ) )
+
+    base_vec <- c(rep(10,3),rep(9,3),rep(3,3))
+    
+    expected_bin_mx <- rep(base_vec,10) %>%
+        rep(., 3) %>%
+        matrix(., nrow = 3, byrow = TRUE)
+
+    expect_equal( binned_matrix, expected_bin_mx )
+
+    compute_entropy <- obj$test_private( name = "get_entropy_fun",
+                                         tag = "function",
+                                         args = list() )
+
+    expect_is( compute_entropy, "function" )
+
     vec <- c(stats::runif(30, min = 0.00, max = 0.09),
              stats::runif(30, min = 0.10, max = 0.19),
              rep(NA, 10),
