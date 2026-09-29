@@ -159,7 +159,6 @@ code <- "atl" # S. radians
 #code <- "brz" # S. stellata
 
 # Define data directory and method list
-data_dir<-file.path(anon_root, "inst", "extdata")
 methods <- c("bioclim", "gower", "enfa", "gam", "glm", "mars", "ann", "maxent", "svm")
 rast_list <- list()
 
@@ -169,7 +168,7 @@ msg <- "Reading SpatRasters from disk, please wait..."
 for(model_idx in cli::cli_progress_along(METHODS_BY_CAT, name = msg)){
     model <- methods[model_idx]
     file_name <- paste0(code, "_", model, ".tif")
-    file_path <- file.path(DATA_DIR, file_name)
+    file_path <- file.path(rasta_data_dir, file_name)
     rast_list <- c(rast_list, terra::rast(file_path))
 }
 
@@ -177,7 +176,7 @@ message()
 
 radians_rasta <- Rasta$new( class = code,
                             replicates = 100,
-			    stacks = RAST_LIST,
+			    stacks = rast_list,
 			    methods = methods )
 ```
 
