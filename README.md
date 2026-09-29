@@ -115,26 +115,18 @@ cat("Installed packages in rasta_lib:\n")
 print(installed.packages(lib.loc = rasta_lib)[, "Package"])
 
 
-#### 7. Expand `rasta_data.tar.gz` into subdirectory `rasta_data` ####
+#### 7. Get suitability data if you do not want to generate it from scratch
 
 # Locate the installed package path within rasta_lib
 rasta_pkg_path <- find.package("Rasta", lib.loc = rasta_lib)
-
-data_tarball <- file.path(anon_root, "inst", "extdata", "rasta_data.tar.gz")
-if (!file.exists(data_tarball)) {
-  stop("Could not find rasta_data.tar.gz in inst/extdata of the installed package.")
-}
 
 rasta_data_dir <- file.path(base_dir, "rasta_data")
 if (!dir.exists(rasta_data_dir)) {
   dir.create(rasta_data_dir, recursive = TRUE)
 }
 
-untar(tarfile = data_tarball, exdir = rasta_data_dir)
-
-cat("Expanded data into rasta_data directory. Contents:\n")
-print(list.files(rasta_data_dir, recursive = TRUE))
-
+print(rasta_data_dir)
+# Download TIFF files from `https://zenodo.org/records/23024655` into the data directory
 
 #### 8. Load Rasta from rasta_lib ####
 
