@@ -67,14 +67,11 @@ library(pak)
 
 #### 4. Download the zipped tarball of the package ####
 
-options(timeout=3000)
-
-zip_url  <- "https://anonymous.4open.science/api/repo/anon-rasta-review/zip"
-zip_file <- file.path(base_dir, "anon-rasta.zip")
+zip_url  <- "https://anonymous.4open.science/api/repo/Anon-Rasta/zip"
+zip_file <- file.path(base_dir, "Anon-Sasta.zip")
 
 download.file(url = zip_url, destfile = zip_file, mode = "wb")
 cat("Downloaded package zip to:", zip_file, "\n")
-
 
 #### 5. Expand the zipped file into subdirectory `anon-rasta` ####
 
