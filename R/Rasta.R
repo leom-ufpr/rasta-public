@@ -11,6 +11,7 @@
 #' - All SpatRasters must have exactly `replicates` layers
 #' - `intervals` must be an integer between 2 and floor(replicates/2)
 #'
+#' @importFrom magrittr %>%
 #' @export
 Rasta <- R6::R6Class(
   "Rasta",

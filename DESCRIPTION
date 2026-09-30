@@ -13,6 +13,7 @@ Imports:
     dplyr (>= 1.1.4),
     magrittr (>= 2.0.4),
     R6 (>= 2.5.1),
+    Rfast (>= 2.1.5.2),
     raster (>= 3.6.30),
     terra (>= 1.8.86),
     tibble (>= 3.2.1)
