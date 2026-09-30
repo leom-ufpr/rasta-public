@@ -165,7 +165,7 @@ rast_list <- list()
 # Create list with all multilayer `SpatRasters` for `S. radians`
 msg <- "Reading SpatRasters from disk, please wait..."
 
-for(model_idx in cli::cli_progress_along(METHODS_BY_CAT, name = msg)){
+for(model_idx in cli::cli_progress_along(methods, name = msg)){
     model <- methods[model_idx]
     file_name <- paste0(code, "_", model, ".tif")
     file_path <- file.path(rasta_data_dir, file_name)
@@ -174,10 +174,10 @@ for(model_idx in cli::cli_progress_along(METHODS_BY_CAT, name = msg)){
 
 message()
 
-radians_rasta <- Rasta$new( class = code,
-                            replicates = 100,
-			    stacks = rast_list,
-			    methods = methods )
+radians_rasta <- Rasta$new(class = code,
+                           replicates = 100,
+			   stacks = rast_list,
+			   methods = methods )
 ```
 
 ### 3\. Getting results
