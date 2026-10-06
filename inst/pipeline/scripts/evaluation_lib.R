@@ -536,24 +536,36 @@ get_pr_auc <- function( observations, suitability )
 
 get_continuous_boyce <- function( observations, suitability )
 {
-    # observations: binary vector where 1=presence and 0=absence
+    # Validate inputs before computation
     
-    uniq_suit <- base::unique( suitability )
+    base::stopifnot( 
+        is_positive_integer( length(observations) ),
+        is_positive_integer( length(suitability) )
+    )
+    
+    base::stopifnot( 
+        all( c( "numeric" %in% typeof( observations ),
+                 "numeric" %in% typeof( suitability ) ) )
+    )
+
+    # Extract presence-only predictions
+    
     presence_suitability <- suitability[ observations == 1 ]
     uniq_pres_suit <- base::unique( presence_suitability )
     
-    if (base::length( uniq_suit ) < 2L || base::length( uniq_pres_suit ) < 2L) {
+    if (base::length( uniq_pres_suit ) < 2L) {
         return( NA_real_ )
     }
 
+    # Compute Continuous Boyce Index
+    
     boyce <- base::suppressWarnings( ecospat::ecospat.boyce( fit = suitability, obs = presence_suitability, nclass = 0, window.w = "default", res = 100, PEplot = FALSE, rm.duplicate = TRUE, method = "spearman" ) )
 
     cbi <- base::as.numeric( boyce$Spearman.cor )[ 1L ]
 
     if (base::length( cbi ) == 0L || ! base::is.finite( cbi )) {
-        warning( "The Continuous Boyce Index could not be estimated; returning NA.", call. = FALSE )
-
-        return( NA_real_ )
+        warning( "The Continuous Boyce Index could not be estimated; returning NA." ) %>%
+            return(.)
     }
 
     return( cbi )
