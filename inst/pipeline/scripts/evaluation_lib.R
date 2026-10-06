@@ -680,7 +680,12 @@ get_roc_auc <- function( observations, suitability )
 
     # Compute ROC object
     
-    roc_obj <- base::suppressMessages( pROC::roc( response = observations, predictor = suitability, levels = c(0, 1), direction = "<", auc = TRUE, plot = FALSE ) )
+    roc_obj <- base::suppressMessages( pROC::roc( response = observations, 
+                                                   predictor = suitability, 
+                                                   levels = c(0, 1), 
+                                                   direction = "<", 
+                                                   auc = TRUE, 
+                                                   plot = FALSE ) )
 
     is_trycatch <- inherits( tryCatch({ roc_obj$auc }, error = function(e) NA_real_ ), "error" )
     
@@ -697,25 +702,34 @@ get_roc_auc <- function( observations, suitability )
 assemble_results_tibble <- function( observations, suitability, rep_id, par_idx, reference_probability = NULL ) {
 
     # Validate inputs first (returns list with validated data and warnings already issued)
-    validated <- validate_enm_inputs( observations = observations, suitability = suitability, rep_id = rep_id, par_idx = par_idx )
+    validated <- validate_enm_inputs( observations = observations, 
+                                      suitability = suitability, 
+                                      rep_id = rep_id, 
+                                      par_idx = par_idx )
 
     observations <- validated$observations
     suitability <- validated$suitability
     
     # Compute TSS statistics (threshold-dependent metrics)
-    tss_statistics <- get_tss_statistics( observations = observations, suitability = suitability )
+    tss_statistics <- get_tss_statistics( observations = observations, 
+                                          suitability = suitability )
 
     # Compute PR AUC (threshold-independent metric for positive class)
-    pr_auc <- get_pr_auc( observations = observations, suitability = suitability )
+    pr_auc <- get_pr_auc( observations = observations, 
+                          suitability = suitability )
 
     # Compute Continuous Boyce Index (presence-only comparison with all sites)
-    continuous_boyce <- get_continuous_boyce( observations = observations, suitability = suitability )
+    continuous_boyce <- get_continuous_boyce( observations = observations, 
+                                              suitability = suitability )
 
     # Compute Brier Skill Score (relative to reference forecast)
-    brier_skill_score <- get_brier_skill_score( observations = observations, suitability = suitability, reference_probability = reference_probability )
+    brier_skill_score <- get_brier_skill_score( observations = observations, 
+                                                suitability = suitability, 
+                                                reference_probability = reference_probability )
 
     # Compute ROC AUC for backward compatibility with existing code expecting this column
-    roc_auc <- get_roc_auc( observations = observations, suitability = suitability )
+    roc_auc <- get_roc_auc( observations = observations, 
+                            suitability = suitability )
 
     tibble::tibble( par_idx = par_idx, rep_id = rep_id, pa.cutoff = tss_statistics$thresh, pa.tn = tss_statistics$tn, pa.fp = tss_statistics$fp, pa.fn = tss_statistics$fn, pa.tp = tss_statistics$tp, pa.sens = tss_statistics$sens, pa.spec = tss_statistics$spec, pa.for = tss_statistics$for, pa.tss = tss_statistics$tss, pr.auc = pr_auc, roc.auc = roc_auc, cbi = continuous_boyce, bss = brier_skill_score )
 }    
@@ -733,7 +747,10 @@ sanitize_results <- function( model_name, eval_rep_id, par_idx, suitability, try
     
     suitability_summary <- base::summary( suitability ) %>% utils::capture.output(.) %>% base::paste0(. , collapse = "\n")
     
-    message( "Failed to get valid confusion matrix stats for model '", model_name, "' replicate ID=", eval_rep_id, "\n", "Suitability summary:\n", suitability_summary, "Error message:\n", base::as.character( try_tibble ))
+    message( "Failed to get valid confusion matrix stats for model '", 
+             model_name, "' replicate ID=", eval_rep_id, "\n", 
+             "Suitability summary:\n", suitability_summary, "Error message:\n", 
+             base::as.character( try_tibble ))
     
     get_na_tibble( eval_rep_id, par_idx ) %>% return(.)
 }
@@ -742,7 +759,11 @@ get_na_tibble <- function( rep_id, par_idx )
 {
     stopifnot( base::is.numeric( rep_id ) | base::is.numeric( par_idx ) )
 
-    tibble::tibble( par_idx = par_idx, rep_id = rep_id, pa.cutoff = NA, pa.tn = NA_integer_, pa.fp = NA_integer_, pa.fn = NA_integer_, pa.tp = NA_integer_, pa.sens = NA_real_, pa.spec = NA_real_, pa.for = NA_real_, pa.tss = NA_real_, pr.auc = NA_real_, roc.auc = NA_real_, cbi = NA_real_, bss = NA_real_ ) %>% return(.)
+    tibble::tibble( par_idx = par_idx, rep_id = rep_id, pa.cutoff = NA, 
+                    pa.tn = NA_integer_, pa.fp = NA_integer_, pa.fn = NA_integer_, 
+                    pa.tp = NA_integer_, pa.sens = NA_real_, pa.spec = NA_real_, 
+                    pa.for = NA_real_, pa.tss = NA_real_, pr.auc = NA_real_, 
+                    roc.auc = NA_real_, cbi = NA_real_, bss = NA_real_ ) %>% return(.)
 }    
 
 sanitize_args <- function( evaluation_tb, par_sets, train_fun, test_fun, model_name )
@@ -751,7 +772,8 @@ sanitize_args <- function( evaluation_tb, par_sets, train_fun, test_fun, model_n
 
     sys_call <- base::sys.call( sys.parent( 1 ) )
     
-    message <- base::paste0( "- called from ", sys_call[[ 1 ]], ", client of ", sys_call[[ 2 ]] )
+    message <- base::paste0( "- called from ", sys_call[[ 1 ]], 
+                             ", client of ", sys_call[[ 2 ]] )
     
     sanitize_tb( evaluation_tb, "evaluation_tb", model_name, message )
     sanitize_tb( par_sets, "par_sets", model_name, message )
