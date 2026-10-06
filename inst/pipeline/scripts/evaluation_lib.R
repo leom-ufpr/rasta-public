@@ -650,12 +650,23 @@ get_brier_skill_score <- function( observations, suitability, ref_probability = 
 
 get_roc_auc <- function( observations, suitability )
 {
-    # observations: binary vector where 1=presence and 0=absence
+    # Validate inputs before computation
+    
+    base::stopifnot( 
+        is_positive_integer( length(observations) ),
+        is_positive_integer( length(suitability) )
+    )
+    
+    base::stopifnot( 
+        all( c( "numeric" %in% typeof( observations ),
+                 "numeric" %in% typeof( suitability ) ) )
+    )
+
+    # Check for constant predictions (degenerate case)
     
     if (base::length(base::unique(suitability)) < 2L) {
-        warning( "ROC AUC is undefined for constant suitability values; returning NA.", call. = FALSE )
-        
-        return(NA_real_)
+        warning( "ROC AUC is undefined for constant suitability values; returning NA." ) %>%
+            return(.)
     }
 
     presences <- suitability[ observations == 1 ]
@@ -663,19 +674,19 @@ get_roc_auc <- function( observations, suitability )
     
     # Handle case where one class has no predictions (degenerate ROC curve)
     if (base::length(presences) < 2L || base::length(absences) < 2L) {
-        warning( "One or both classes have insufficient observations; ROC AUC is undefined.", call. = FALSE )
-
-        return( NA_real_ )
+        warning( "One or both classes have insufficient observations; ROC AUC is undefined." ) %>%
+            return(.)
     }
 
+    # Compute ROC object
+    
     roc_obj <- base::suppressMessages( pROC::roc( response = observations, predictor = suitability, levels = c(0, 1), direction = "<", auc = TRUE, plot = FALSE ) )
 
     is_trycatch <- inherits( tryCatch({ roc_obj$auc }, error = function(e) NA_real_ ), "error" )
     
     if (is_trycatch) { 
-        warning( "ROC AUC could not be computed; returning NA.", call. = FALSE )
-        
-        return( NA_real_ )
+        warning( "ROC AUC could not be computed; returning NA." ) %>%
+            return(.)
     }
 
     base::as.numeric( roc_obj$auc ) %>%
