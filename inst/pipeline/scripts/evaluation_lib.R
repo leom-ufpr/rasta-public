@@ -491,25 +491,41 @@ get_tss_statistics <- function( observations, suitability )
 
 get_pr_auc <- function( observations, suitability )
 {
-    # observations: binary vector where 1=presence and 0=absence
+    # Validate inputs before computation
+    
+    base::stopifnot( 
+        is_positive_integer( length(observations) ),
+        is_positive_integer( length(suitability) )
+    )
+    
+    base::stopifnot( 
+        all( c( "numeric" %in% typeof( observations ),
+                 "numeric" %in% typeof( suitability ) ) )
+    )
+
+    # Extract positive and negative class scores
+    
     positive_scores <- suitability[ observations == 1 ]
     negative_scores <- suitability[ observations == 0 ]
 
-    if (base::length(base::unique(suitability)) < 2L) {
-        warning( "PR AUC is undefined for constant suitability values; returning NA.", call. = FALSE )
-        
-        return( NA_real_ )
+    # Check for constant predictions (degenerate case)
+    
+    if( base::length(base::unique(suitability)) < 2L )
+    {
+        warning( "PR AUC is undefined for constant suitability values; returning NA." ) %>%
+            return(.)
     }
 
-    # Handle case where one class has no predictions (degenerate ROC curve)
-    if (base::length(negative_scores) == 0L || base::length(positive_scores) == 0L) {
-        warning( "One or both classes have zero observations; PR AUC is undefined.", call. = FALSE )
-
-        return( NA_real_ )
+    # Handle degenerate ROC curve cases
+    
+    if (base::length(negative_scores) == 0L | base::length(positive_scores) == 0L )
+    {
+        warning( "One or both classes have zero observations; PR AUC is undefined." ) %>%
+            return(.)
     }
 
-    # Note: counterintuitive naming in PRROC! 'scores.class0' actually contains
-    # the POSITIVE class (1)
+    # Compute partial ROC curve
+    
     pr <- PRROC::pr.curve( scores.class0 = positive_scores,
                            scores.class1 = negative_scores,
                            curve = FALSE )
@@ -521,6 +537,7 @@ get_pr_auc <- function( observations, suitability )
 get_continuous_boyce <- function( observations, suitability )
 {
     # observations: binary vector where 1=presence and 0=absence
+    
     uniq_suit <- base::unique( suitability )
     presence_suitability <- suitability[ observations == 1 ]
     uniq_pres_suit <- base::unique( presence_suitability )
@@ -545,6 +562,7 @@ get_continuous_boyce <- function( observations, suitability )
 get_brier_skill_score <- function( observations, suitability, ref_probability = NULL )
 {
     # observations: binary vector where 1=presence and 0=absence
+    
     if ( base::any( suitability < 0 | suitability > 1 ) )
     {
         stop( "Brier Skill Score requires `suitability` to contain probabilities in [0, 1].", call. = FALSE )
@@ -621,6 +639,7 @@ get_brier_skill_score <- function( observations, suitability, ref_probability = 
 get_roc_auc <- function( observations, suitability )
 {
     # observations: binary vector where 1=presence and 0=absence
+    
     if (base::length(base::unique(suitability)) < 2L) {
         warning( "ROC AUC is undefined for constant suitability values; returning NA.", call. = FALSE )
         
